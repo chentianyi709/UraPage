@@ -1,6 +1,6 @@
 # UraPage
 
-一个 iOS 原生多源内容阅读器：在同一个 App 内浏览、搜索、阅读与离线管理来自多个独立内容源的作品。
+一个 iOS 原生多源内容阅读器：在同一个 App 内浏览、搜索、阅读与离线管理来自多个独立内容源的作品。仅适配 iPhone（iOS 26.0+），暂无 iPad、Mac 版本，也未适配 iPhone Duo 这类折叠屏机型。
 
 技术上是一份**单 Target 的 SwiftUI 工程**：来源以编译期模块接入，公共层不认识任何具体来源，新增来源只需实现一套契约并在组合根注册。
 
@@ -26,7 +26,8 @@
 
 | 项 | 版本 |
 | --- | --- |
-| 系统 | iOS 26.0 及以上，仅 iPhone、仅竖屏 |
+| 系统 | iOS 26.0 及以上（受系统支持范围限制） |
+| 设备 | **仅 iPhone**；不支持 iPad、Mac（无 iPad 版、无 Mac Catalyst）；**暂未适配 iPhone Duo 等可折叠机型**（展开后的窗口尺寸与多窗口交互），也没做横屏 |
 | Xcode | 27.0（Swift 6，complete strict concurrency） |
 | XcodeGen | 2.42.0 及以上 |
 | 语言 | Swift 6 |
@@ -35,7 +36,7 @@
 
 ```bash
 brew install xcodegen
-git clone <repository-url> UraPage
+git clone https://github.com/chentianyi709/UraPage.git
 cd UraPage
 xcodegen generate
 open UraPage.xcodeproj
@@ -64,7 +65,19 @@ xcodebuild -project UraPage.xcodeproj \
 
 ## 安装
 
-本项目不在 App Store 发布，安装包需自行用开发者证书签名后侧载；证书与签名配置不随仓库提供。
+本项目不在 App Store 发布。每次推 `v*` 标签，CI 会构建**未签名 IPA** 并发布到 [Releases](https://github.com/chentianyi709/UraPage/releases)，文件名形如 `UraPage-v1.1.0-alpha.3-unsigned.ipa`。
+
+下载后需要用开发者证书自行签名再侧载（证书与签名配置不随仓库提供）。也可以从源码自行构建，再用自己的账号签名。
+
+## 分支与版本
+
+| 分支／标签 | 用途 |
+| --- | --- |
+| `main` | 开发主线，功能与文档改动先落在这里 |
+| `release` | 发布分支，包含 GitHub Actions 工作流（`main` 上没有） |
+| `v*` 标签 | 触发构建并把未签名 IPA 发布到 Releases（约定从 `release` 打） |
+
+版本号三段式（如 `1.1.0`）写在 `project.yml`。预发布后缀按 SemVer 排序：内测 `-alpha.N`、公测 `-beta.N`，正式版不带后缀。
 
 ## 数据与隐私
 
@@ -137,7 +150,8 @@ Targets/UraPageApp/
 
 ## 已知限制
 
-- 仅支持 iOS 26.0 及以上、iPhone、竖屏。
+- **只支持 iOS 26.0 及以上的 iPhone**：没有 iPad 版，不支持 Mac（含 Mac Catalyst／Designed for iPad），也不支持横屏与多窗口，iPad 上一律以兼容模式运行且不在支持范围内。
+- **未适配 iPhone Duo 等折叠屏机型**：界面按 iPhone 竖屏尺寸设计，展开／折叠切换带来的窗口变化与多窗口分屏没有对应布局，可能出现拉伸或留白，未做针对性验证。
 - 不在 App Store 分发，安装包需自行签名；证书过期后要重新签名并重装。
 - 内容源由第三方提供，其接口或页面结构变更会导致对应来源暂时不可用，需要更新源码后重新构建。
 - 没有崩溃上报，问题定位依赖使用者的描述与截图。
@@ -145,7 +159,7 @@ Targets/UraPageApp/
 
 ## 反馈
 
-提 Issue 请附上：来源名称、复现步骤、iOS 版本、App 版本与构建号（当前见 `project.yml` 的 `MARKETING_VERSION`／`CURRENT_PROJECT_VERSION`）。没有崩溃日志，录屏或截图能最快定位问题。
+提 Issue 请附上：来源名称、复现步骤、iOS 版本，以及**你从哪个 Release 标签安装的**（如 `v1.1.0-alpha.3`）。没有崩溃日志，录屏或截图能最快定位问题。
 
 ## 第三方依赖
 
