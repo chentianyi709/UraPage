@@ -55,11 +55,22 @@ jobs:
           (cd package && zip -qry "${GITHUB_WORKSPACE}/UraPage-${GITHUB_REF_NAME}-unsigned.ipa" Payload)
 
       - name: Create GitHub Release with generated notes
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "${GITHUB_REF_NAME}"
-          "UraPage-${GITHUB_REF_NAME}-unsigned.ipa"
-          --title "${GITHUB_REF_NAME}"
-          --generate-notes
-          --verify-tag
+        run: |
+          set -euo pipefail
+
+          args=(
+            "${GITHUB_REF_NAME}"
+            "UraPage-${GITHUB_REF_NAME}-unsigned.ipa"
+            --title "${GITHUB_REF_NAME}"
+            --generate-notes
+            --verify-tag
+          )
+
+          if [[ "${GITHUB_REF_NAME}" =~ -(alpha|beta|rc)(\.|$) ]]; then
+            args+=(--prerelease)
+          fi
+
+          gh release create "${args[@]}"
