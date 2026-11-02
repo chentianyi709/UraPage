@@ -20,7 +20,7 @@ struct BookmarkButton: View {
         Button {
             toggle()
         } label: {
-            Image(systemName: isFavorite == true ? "heart.fill" : "heart")
+            Image(systemName: isFavorite == true ? "bookmark.fill" : "bookmark")
                 .foregroundStyle(isFavorite == true ? Color.brandPrimary : Color.textPrimary)
         }
         .accessibilityLabel(
