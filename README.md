@@ -86,43 +86,32 @@ Targets/UraPageApp/
     Features/              # 跨来源业务页面（详情、阅读器、下载、书架）
     SourceModules/         # 各内容源的完整实现，互不引用
   Resources/               # Assets、Info.plist、预览资源
-BusinessLogic/             # 业务规则与开发记录
-Scripts/                   # 本地校验脚本
+.swiftformat               # 格式化规则
 ```
 
-依赖方向是单向的：`SourceModules` → `Core` / `CommonUI`；`Core` 与 `CommonUI` 不引用任何具体来源；`App` 负责把它们装配起来。这条边界由 `Scripts/check_architecture.py` 校验。
+被 `.gitignore` 忽略的本地目录不在此列。
+
+依赖方向是单向的：`SourceModules` → `Core` / `CommonUI`；`Core` 与 `CommonUI` 不引用任何具体来源；`App` 负责把它们装配起来。
 
 ## 新增一个内容源
 
-按 `BusinessLogic/开发记录/新增漫画源接入清单.md` 逐步执行。要点：
+来源以编译期模块接入，全部实现放在 `Targets/UraPageApp/Sources/SourceModules/<来源>/`：
 
-- 来源实现放在 `Targets/UraPageApp/Sources/SourceModules/<来源>/`，只提供本源规则；
-- 通用流程复用 `Core/SourceRuntime`，不复制公共网络／分页／图片逻辑；
-- 在组合根注册模块，不改公共层；
-- 同步 `BusinessLogic/目录结构与文件作用.md`。
+- 复用 `Core/SourceRuntime` 的通用流程，不复制公共网络、分页、图片与认证逻辑；
+- 只写本源规则：请求与鉴权、DTO／HTML 映射、路由与跨源跳转目标；
+- 在 `App/` 的组合根注册模块，不改动 `Core` 与 `CommonUI`；
+- 不需要改 `project.yml`：`Sources/` 是整目录纳入，`xcodegen generate` 会带上新文件。
 
 ## 开发约定
 
-编码规则见 **`AGENTS.md`**（目录归属、依赖锁定、并发边界、UI 约定、验证口径、敏感信息）。改动前请先读它。
+- 工程由 `project.yml` 生成，不手改 `.xcodeproj`；改完重新 `xcodegen generate`。
+- Swift 6 + complete strict concurrency；UI／App 层的非 View 类型标 `@MainActor`，公共基座与来源保持 nonisolated／actor。
+- 依赖用 SPM 声明在 `project.yml`，新增前先确认用途、体积与许可证。
+- 改动 Swift 后跑 `swiftformat Targets`（只带入自己的改动，不批量重排）。
+- 边界：`SourceModules` 可依赖 `Core`／`CommonUI`，反向不允许；各来源之间互不引用。
+- 不写单元测试与 UI 测试，改动按模拟器或真机手动回归。
 
-常跑的命令：
-
-```bash
-swiftformat Targets                      # 格式化（只带入自己的改动）
-python3 Scripts/check_docs.py            # 目录文档与源码 1:1 校验
-python3 Scripts/check_architecture.py    # 依赖方向与来源隔离校验
-```
-
-文档索引：
-
-| 文档 | 内容 |
-| --- | --- |
-| `BusinessLogic/目录结构与文件作用.md` | 逐文件职责与目录树 |
-| `BusinessLogic/漫画源接入约定.md` | 来源协议、业务规则、跳转语义 |
-| `BusinessLogic/开发记录/项目现状.md` | 当前能力、已定决策、待办 |
-| `BusinessLogic/开发记录/配置索引.md` | 配置与设置项的归属 |
-
-本项目不包含单元测试与 UI 测试，改动按 `AGENTS.md` 第 6 节的验证口径人工回归。
+项目内部的开发约定、逐文件职责清单与决策记录保存在作者本地，不随仓库分发。
 
 ## 关于本项目
 
