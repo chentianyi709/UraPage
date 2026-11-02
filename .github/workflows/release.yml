@@ -36,6 +36,7 @@ jobs:
             -scheme UraPage \
             -configuration Release \
             -destination 'generic/platform=iOS' \
+            -skipMacroValidation \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             MARKETING_VERSION="${marketing_version}" \
