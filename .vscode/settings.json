@@ -1,0 +1,12 @@
+{
+    "sweetpad.buildServer.provider": "xcode-build-server",
+    "sweetpad.xcodegen.autogenerate": true,
+    "sweetpad.build.autoGenerateBuildServerConfig": true,
+    "sweetpad.build.autoRestartSwiftLSP": true,
+    "sweetpad.build.xcodeWorkspacePath": "UraPage.xcodeproj/project.xcworkspace",
+    "sweetpad.build.configuration": "Debug",
+    "sweetpad.build.args": [
+        "-skipMacroValidation"
+    ],
+    "sweetpad.build.scheme": "UraPage"
+}

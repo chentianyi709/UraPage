@@ -1,0 +1,10 @@
+#include "Base.xcconfig"
+#include? "Local.xcconfig"
+
+// 性能优先，保持 Release 默认 -O：-Osize 的运行时代价真实存在，而本工程实测并未减小体积。
+SWIFT_OPTIMIZATION_LEVEL = -O
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+// 构建期产品校验（Xcode 官方模板 Release 默认值）。
+VALIDATE_PRODUCT = YES
+// 资源按访问速度优化（体积不再作为目标）：time = 访问更快，space = 更小。
+ASSETCATALOG_COMPILER_OPTIMIZATION = time

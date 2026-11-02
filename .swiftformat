@@ -1,0 +1,114 @@
+# 固定 Swift 版本，避免版本相关规则在不同环境中产生差异
+--swift-version 6.2
+
+
+# ─────────────────────────────────────────────
+# 基础排版
+# ─────────────────────────────────────────────
+
+# 使用 Swift 项目常见的 4 空格缩进，不使用 Tab
+--indent 4
+--tab-width 4
+--smart-tabs disabled
+
+# 类似 Prettier，但考虑到 Swift 类型和函数签名较长，使用 100 列
+--max-width 110
+
+# 跨平台统一使用 LF
+--linebreaks lf
+
+# K&R 大括号：else / catch 与前一个右括号同行
+--allman false
+--else-position same-line
+
+# 多行 guard 的 else 独立成行；单行 guard 的 else 保持同行
+--guard-else auto
+
+# 空代码块保持紧凑：{}
+--empty-braces no-space
+
+# 不保留分号
+--semicolons never
+
+# 清理行尾空格，但不强制空行缩进
+--trim-whitespace always
+--indent-blank-lines false
+
+
+# ─────────────────────────────────────────────
+# 多行参数、数组和条件
+# ─────────────────────────────────────────────
+
+# 一旦需要换行，每个参数单独一行，右括号独立成行
+--wrap-arguments before-first
+--wrap-parameters before-first
+--wrap-collections before-first
+--wrap-conditions after-first
+--closing-paren balanced
+--call-site-paren balanced
+
+# 多行 if / guard 的左大括号仍放在最后一个条件后面
+--disable wrapMultilineStatementBraces
+
+# 避免只换一部分参数，减少参差不齐的布局
+--allow-partial-wrapping false
+
+# 类似 Prettier：多行列表保留尾逗号，新增一项时 diff 更干净
+--trailing-commas always
+
+# 多行链式调用保持纵向排列
+--enable wrapMultilineFunctionChains
+
+
+# ─────────────────────────────────────────────
+# Swift 原生可读性
+# ─────────────────────────────────────────────
+
+# 遵循 Swift 惯例：只保留语义上必需的 self
+--self remove
+
+# 使用 Swift 惯用的逗号连接多个 if / guard 条件
+--enable andOperator
+
+# switch 的多行 case 之间留一个空行
+--enable blankLineAfterSwitchCase
+--blank-line-after-switch-case multiline-only
+
+# 连续 guard 后留一个空行，类似 JS 中 early return 后分隔主逻辑
+--enable blankLinesAfterGuardStatements
+--line-between-guards false
+
+# 一行只声明一个存储属性
+--enable singlePropertyPerLine
+
+# import 保持稳定的字母顺序
+--import-grouping access-control,alpha
+
+
+# ─────────────────────────────────────────────
+# 控制高风险或大范围代码改写
+# ─────────────────────────────────────────────
+
+# 不把普通赋值语句重写成 if / switch expression
+--disable conditionalAssignment
+
+# 不移动或重组声明，不把 namespace struct 改成 enum
+--disable enumNamespaces,extensionAccessControl,sortDeclarations
+
+# forEach 和 for 循环不只是排版差异；保留作者原本的选择
+--disable preferForLoop
+
+# 不自动删除未使用的参数名，避免影响协议实现和对外 API
+--disable unusedArguments
+
+# 保留显式 Sendable；这是本配置最重要的保护项之一
+--disable redundantSendable
+
+# 不删除 async / throws / Equatable / 初始化器等显式声明
+--disable redundantAsync,redundantEquatable,redundantMemberwiseInit,redundantThrows
+
+# 测试代码中不自动改写 force try / force unwrap
+--disable noForceTryInTests,noForceUnwrapInTests
+
+# 不改变 IBOutlet 的 weak / strong 所有权
+--disable strongOutlets

@@ -1,0 +1,42 @@
+import Foundation
+
+/// 哔咔固定的 Tab 名称、图标与顺序。
+enum BikaTab: SourceTabValue, CaseIterable, Identifiable {
+    /// 本源稳定标识。
+    var sourceID: ComicSourceID {
+        .bika
+    }
+
+    case home
+    case ranking
+    case categories
+    case search
+    case library
+
+    /// 使用 Tab 自身作为 SwiftUI 列表的稳定标识。
+    var id: Self {
+        self
+    }
+
+    /// Tab 的固定显示名称。
+    var title: String {
+        switch self {
+        case .home: "首页"
+        case .ranking: "排行榜"
+        case .categories: "分类"
+        case .search: "搜索"
+        case .library: "书架"
+        }
+    }
+
+    /// Tab 的固定 SF Symbol。
+    var systemImage: String {
+        switch self {
+        case .home: "house"
+        case .ranking: "chart.bar.xaxis"
+        case .categories: "square.grid.2x2"
+        case .search: "magnifyingglass"
+        case .library: "books.vertical"
+        }
+    }
+}

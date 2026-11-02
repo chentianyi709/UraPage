@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "bika-source-logo.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

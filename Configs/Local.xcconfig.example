@@ -1,0 +1,4 @@
+// Copy to Local.xcconfig for local signing configuration.
+// Do not commit the copied file or real signing values.
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+// CODE_SIGN_STYLE = Automatic

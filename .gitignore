@@ -1,0 +1,87 @@
+### macOS ###
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Icon
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+### Xcode / Tuist generated projects ###
+*.xcodeproj/
+*.xcworkspace/
+Derived/
+DerivedData/
+build/
+*.moved-aside
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.gcno
+
+### Xcode build products ###
+*.app
+*.ipa
+*.dSYM/
+*.xcarchive/
+*.xcresult/
+
+### Tuist / SwiftPM generated artifacts ###
+graph.dot
+.tuist-generated
+.tuist-cache/
+Tuist/.build/
+**/.build/
+**/.swiftpm/
+.package.resolved
+Packages/**/Package.resolved
+# Keep Tuist/Package.resolved trackable if you want reproducible app dependency resolution.
+!Tuist/Package.resolved
+
+### VS Code / SweetPad local state ###
+buildServer.json
+.vscode/*
+!.vscode/settings.json
+
+### Local configuration / secrets ###
+Local.xcconfig
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+
+### Local agent / tool state ###
+.opencode/
+.workbuddy/
+.agents/
+AGENTS.md
+
+### Python 脚本缓存 ###
+__pycache__/
+*.pyc
+
+### Local notes / temporary files ###
+LocalFiles/
+Demo/
+**/**/.miaoyan-conflicts
+BusinessLogic/
+Scripts/

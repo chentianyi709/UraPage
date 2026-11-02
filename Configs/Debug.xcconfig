@@ -1,0 +1,9 @@
+#include "Base.xcconfig"
+#include? "Local.xcconfig"
+
+SWIFT_OPTIMIZATION_LEVEL = -Onone
+// Debug 用 dwarf：不生成 dSYM，少一次 dsymutil；dSYM 只在 Release 需要。
+DEBUG_INFORMATION_FORMAT = dwarf
+// 只编译当前目标架构：模拟器 Debug 不再同时编 x86_64（Apple Silicon 用不到），Debug 构建明显更快。
+ONLY_ACTIVE_ARCH = YES
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) DEBUG=1
