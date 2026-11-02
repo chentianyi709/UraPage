@@ -1,0 +1,65 @@
+name: Build unsigned IPA and publish release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: xcode-27
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build unsigned iOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          marketing_version="${version%%-*}"
+
+          xcodebuild \
+            -project UraPage.xcodeproj \
+            -scheme UraPage \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="${marketing_version}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            build
+
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          app_path="build/Build/Products/Release-iphoneos/UraPage.app"
+          test -d "${app_path}"
+
+          mkdir -p package/Payload
+          ditto "${app_path}" package/Payload/UraPage.app
+          (cd package && zip -qry "${GITHUB_WORKSPACE}/UraPage-${GITHUB_REF_NAME}-unsigned.ipa" Payload)
+
+      - name: Create GitHub Release with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${GITHUB_REF_NAME}"
+          "UraPage-${GITHUB_REF_NAME}-unsigned.ipa"
+          --title "${GITHUB_REF_NAME}"
+          --generate-notes
+          --verify-tag
