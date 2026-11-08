@@ -1,8 +1,10 @@
 # UraPage
 
-一个 iOS 原生多源内容阅读器：在同一个 App 内浏览、搜索、阅读与离线管理来自多个独立内容源的作品。
+一个 iOS 原生多源内容阅读器：在同一个 App 内浏览、搜索、阅读与离线管理来自多个独立内容源的作品。仅适配 iPhone（iOS 26.0+），暂无 iPad、Mac 版本，也未适配 iPhone Duo 这类折叠屏机型。
 
 技术上是一份**单 Target 的 SwiftUI 工程**：来源以编译期模块接入，公共层不认识任何具体来源，新增来源只需实现一套契约并在组合根注册。
+
+> 📦 **[下载最新安装包（未签名 IPA）](https://github.com/chentianyi709/UraPage/releases)**：打开最新版本，在 **Assets** 中下载 `.ipa` 文件。
 
 > 本项目仅用于技术学习与研究，不提供、不托管、不分发任何内容。详见文末免责声明。
 >
@@ -26,7 +28,8 @@
 
 | 项 | 版本 |
 | --- | --- |
-| 系统 | iOS 26.0 及以上，仅 iPhone、仅竖屏 |
+| 系统 | iOS 26.0 及以上（受系统支持范围限制） |
+| 设备 | **仅 iPhone**；不支持 iPad、Mac（无 iPad 版、无 Mac Catalyst）；**暂未适配 iPhone Duo 等可折叠机型**（展开后的窗口尺寸与多窗口交互），也没做横屏 |
 | Xcode | 27.0（Swift 6，complete strict concurrency） |
 | XcodeGen | 2.42.0 及以上 |
 | 语言 | Swift 6 |
@@ -35,7 +38,7 @@
 
 ```bash
 brew install xcodegen
-git clone <repository-url> UraPage
+git clone https://github.com/chentianyi709/UraPage.git
 cd UraPage
 xcodegen generate
 open UraPage.xcodeproj
@@ -64,7 +67,19 @@ xcodebuild -project UraPage.xcodeproj \
 
 ## 安装
 
-本项目不在 App Store 发布，安装包需自行用开发者证书签名后侧载；证书与签名配置不随仓库提供。
+本项目不在 App Store 发布。每次推 `v*` 标签，CI 会构建**未签名 IPA** 并发布到 [Releases](https://github.com/chentianyi709/UraPage/releases)，文件名形如 `UraPage-v1.1.0-alpha.3-unsigned.ipa`。
+
+下载后需要用开发者证书自行签名再侧载（证书与签名配置不随仓库提供）。也可以从源码自行构建，再用自己的账号签名。
+
+## 分支与版本
+
+| 分支／标签 | 用途 |
+| --- | --- |
+| `main` | 开发主线，功能与文档改动先落在这里 |
+| `release` | 发布分支，包含 GitHub Actions 工作流（`main` 上没有） |
+| `v*` 标签 | 触发构建并把未签名 IPA 发布到 Releases（约定从 `release` 打） |
+
+版本号三段式（如 `1.1.0`）写在 `project.yml`。预发布后缀按 SemVer 排序：内测 `-alpha.N`、公测 `-beta.N`，正式版不带后缀。
 
 ## 数据与隐私
 
@@ -86,43 +101,32 @@ Targets/UraPageApp/
     Features/              # 跨来源业务页面（详情、阅读器、下载、书架）
     SourceModules/         # 各内容源的完整实现，互不引用
   Resources/               # Assets、Info.plist、预览资源
-BusinessLogic/             # 业务规则与开发记录
-Scripts/                   # 本地校验脚本
+.swiftformat               # 格式化规则
 ```
 
-依赖方向是单向的：`SourceModules` → `Core` / `CommonUI`；`Core` 与 `CommonUI` 不引用任何具体来源；`App` 负责把它们装配起来。这条边界由 `Scripts/check_architecture.py` 校验。
+被 `.gitignore` 忽略的本地目录不在此列。
+
+依赖方向是单向的：`SourceModules` → `Core` / `CommonUI`；`Core` 与 `CommonUI` 不引用任何具体来源；`App` 负责把它们装配起来。
 
 ## 新增一个内容源
 
-按 `BusinessLogic/开发记录/新增漫画源接入清单.md` 逐步执行。要点：
+来源以编译期模块接入，全部实现放在 `Targets/UraPageApp/Sources/SourceModules/<来源>/`：
 
-- 来源实现放在 `Targets/UraPageApp/Sources/SourceModules/<来源>/`，只提供本源规则；
-- 通用流程复用 `Core/SourceRuntime`，不复制公共网络／分页／图片逻辑；
-- 在组合根注册模块，不改公共层；
-- 同步 `BusinessLogic/目录结构与文件作用.md`。
+- 复用 `Core/SourceRuntime` 的通用流程，不复制公共网络、分页、图片与认证逻辑；
+- 只写本源规则：请求与鉴权、DTO／HTML 映射、路由与跨源跳转目标；
+- 在 `App/` 的组合根注册模块，不改动 `Core` 与 `CommonUI`；
+- 不需要改 `project.yml`：`Sources/` 是整目录纳入，`xcodegen generate` 会带上新文件。
 
 ## 开发约定
 
-编码规则见 **`AGENTS.md`**（目录归属、依赖锁定、并发边界、UI 约定、验证口径、敏感信息）。改动前请先读它。
+- 工程由 `project.yml` 生成，不手改 `.xcodeproj`；改完重新 `xcodegen generate`。
+- Swift 6 + complete strict concurrency；UI／App 层的非 View 类型标 `@MainActor`，公共基座与来源保持 nonisolated／actor。
+- 依赖用 SPM 声明在 `project.yml`，新增前先确认用途、体积与许可证。
+- 改动 Swift 后跑 `swiftformat Targets`（只带入自己的改动，不批量重排）。
+- 边界：`SourceModules` 可依赖 `Core`／`CommonUI`，反向不允许；各来源之间互不引用。
+- 不写单元测试与 UI 测试，改动按模拟器或真机手动回归。
 
-常跑的命令：
-
-```bash
-swiftformat Targets                      # 格式化（只带入自己的改动）
-python3 Scripts/check_docs.py            # 目录文档与源码 1:1 校验
-python3 Scripts/check_architecture.py    # 依赖方向与来源隔离校验
-```
-
-文档索引：
-
-| 文档 | 内容 |
-| --- | --- |
-| `BusinessLogic/目录结构与文件作用.md` | 逐文件职责与目录树 |
-| `BusinessLogic/漫画源接入约定.md` | 来源协议、业务规则、跳转语义 |
-| `BusinessLogic/开发记录/项目现状.md` | 当前能力、已定决策、待办 |
-| `BusinessLogic/开发记录/配置索引.md` | 配置与设置项的归属 |
-
-本项目不包含单元测试与 UI 测试，改动按 `AGENTS.md` 第 6 节的验证口径人工回归。
+项目内部的开发约定、逐文件职责清单与决策记录保存在作者本地，不随仓库分发。
 
 ## 关于本项目
 
@@ -148,7 +152,8 @@ python3 Scripts/check_architecture.py    # 依赖方向与来源隔离校验
 
 ## 已知限制
 
-- 仅支持 iOS 26.0 及以上、iPhone、竖屏。
+- **只支持 iOS 26.0 及以上的 iPhone**：没有 iPad 版，不支持 Mac（含 Mac Catalyst／Designed for iPad），也不支持横屏与多窗口，iPad 上一律以兼容模式运行且不在支持范围内。
+- **未适配 iPhone Duo 等折叠屏机型**：界面按 iPhone 竖屏尺寸设计，展开／折叠切换带来的窗口变化与多窗口分屏没有对应布局，可能出现拉伸或留白，未做针对性验证。
 - 不在 App Store 分发，安装包需自行签名；证书过期后要重新签名并重装。
 - 内容源由第三方提供，其接口或页面结构变更会导致对应来源暂时不可用，需要更新源码后重新构建。
 - 没有崩溃上报，问题定位依赖使用者的描述与截图。
@@ -156,7 +161,7 @@ python3 Scripts/check_architecture.py    # 依赖方向与来源隔离校验
 
 ## 反馈
 
-提 Issue 请附上：来源名称、复现步骤、iOS 版本、App 版本与构建号（当前见 `project.yml` 的 `MARKETING_VERSION`／`CURRENT_PROJECT_VERSION`）。没有崩溃日志，录屏或截图能最快定位问题。
+提 Issue 请附上：来源名称、复现步骤、iOS 版本，以及**你从哪个 Release 标签安装的**（如 `v1.1.0-alpha.3`）。没有崩溃日志，录屏或截图能最快定位问题。
 
 ## 第三方依赖
 
