@@ -16,9 +16,12 @@ struct ShenshiComicDetail: ComicDetailContentProviding {
         publisher.map { [$0.name] } ?? []
     }
 
-    /// 只把标签名称交给共享详情展示协议。
-    var tags: [String] {
-        comicTags.map(\.name)
+    /// 网页只提供一个分类与一组标签；分类放在前面，空组由展示层跳过。
+    var tagGroups: [ComicTagGroup] {
+        [
+            ComicTagGroup(kind: .category, values: category.map { [$0.title] } ?? []),
+            ComicTagGroup(kind: .tag, values: comicTags.map(\.name)),
+        ]
     }
 
     /// 向统一字段行提供绅士网页真实拥有的图片数量。

@@ -23,9 +23,10 @@ struct JMComicDetailView: View {
 
                 shell.navigator.push(JMComicRoute.queryComics(query: query))
             },
-            onSelectCategory: { _, _, _ in },
-            onSelectTag: { _, _, tag in
-                shell.navigator.push(JMComicRoute.tagComics(tag))
+            onSelectTag: { _, _, kind, name in
+                guard kind == .tag else { return }
+
+                shell.navigator.push(JMComicRoute.tagComics(name))
             },
             copyContentProvider: { [identity] in
                 ComicDetailCopyResult(
@@ -64,7 +65,6 @@ struct JMComicDetailView: View {
         let sourceDetail = try await services.detail(for: identity)
         let snapshot = DownloadedComicDetailSnapshot(
             detail: sourceDetail,
-            categories: [],
             sourceNavigationData: Data(),
             showsChaptersButton: sourceDetail.showsChaptersButton,
         )

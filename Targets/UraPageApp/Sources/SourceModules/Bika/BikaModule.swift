@@ -15,7 +15,12 @@ struct BikaModule: SourceExperienceModule {
 
     /// 来源展示信息；Logo 资源名指向 App Assets。
     var descriptor: SourceDescriptor {
-        SourceDescriptor(sourceID: services.sourceID, displayName: "哔咔漫画", logo: .asset("BikaSourceLogo"))
+        SourceDescriptor(
+            sourceID: services.sourceID,
+            displayName: "哔咔漫画",
+            logo: .asset("BikaSourceLogo"),
+            tagKinds: [.author, .category, .tag],
+        )
     }
 
     /// 哔咔账号访问事实；供根页面头像按登录态着色。
@@ -60,13 +65,16 @@ struct BikaModule: SourceExperienceModule {
 
     /// 把收藏的书签还原成本源列表页：payload 是本源收藏时编码的 typed 值。
     func resolve(_ bookmark: Bookmark) throws -> BikaRoute {
-        switch bookmark.kind {
-        case .category:
+        switch bookmark.kindID {
+        case ComicTagKind.category.id:
             try .categoryComics(bookmark.decoded(BikaComicCategory.self))
-        case .tag:
+        case ComicTagKind.tag.id:
             try .tagComics(bookmark.decoded(String.self))
-        case .author:
+        case ComicTagKind.author.id:
             try .contributorComics(bookmark.decoded(BikaComicContributor.self))
+        default:
+            // 本源没有这个维度的列表页（例如来源升级后移除的维度）。
+            throw ComicSourceError.invalidIdentity
         }
     }
 

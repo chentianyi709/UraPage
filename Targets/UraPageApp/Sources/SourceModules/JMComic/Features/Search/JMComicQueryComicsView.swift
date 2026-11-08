@@ -8,9 +8,9 @@ struct JMComicQueryComicsView: View {
 
     let query: String
     let searchType: JMComicSearchType
-    let bookmarkKind: BookmarkKind
+    let bookmarkKind: ComicTagKind
 
-    init(query: String, searchType: JMComicSearchType = .site, bookmarkKind: BookmarkKind) {
+    init(query: String, searchType: JMComicSearchType = .site, bookmarkKind: ComicTagKind) {
         self.query = query
         self.searchType = searchType
         self.bookmarkKind = bookmarkKind

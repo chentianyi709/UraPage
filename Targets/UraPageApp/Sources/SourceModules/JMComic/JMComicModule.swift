@@ -15,7 +15,12 @@ struct JMComicModule: SourceExperienceModule {
 
     /// 来源展示信息；Logo 资源名指向 App Assets。
     var descriptor: SourceDescriptor {
-        SourceDescriptor(sourceID: services.sourceID, displayName: "禁漫天堂", logo: .asset("JMComicSourceLogo"))
+        SourceDescriptor(
+            sourceID: services.sourceID,
+            displayName: "禁漫天堂",
+            logo: .asset("JMComicSourceLogo"),
+            tagKinds: [.author, .tag],
+        )
     }
 
     /// 禁漫账号访问事实；供根页面头像按登录态着色。
@@ -64,12 +69,12 @@ struct JMComicModule: SourceExperienceModule {
 
     /// 把收藏的书签还原成本源列表页：作者与标签都是固定关键词，查询词即 payload。
     func resolve(_ bookmark: Bookmark) throws -> JMComicRoute {
-        switch bookmark.kind {
-        case .author:
+        switch bookmark.kindID {
+        case ComicTagKind.author.id:
             try .queryComics(query: bookmark.decoded(String.self))
-        case .tag:
+        case ComicTagKind.tag.id:
             try .tagComics(bookmark.decoded(String.self))
-        case .category:
+        default:
             // 禁漫没有分类页，本源不会产出这类收藏。
             throw ComicSourceError.invalidIdentity
         }

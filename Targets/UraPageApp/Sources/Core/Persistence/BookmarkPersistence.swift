@@ -28,7 +28,7 @@ actor BookmarkPersistence {
         try modelContext.save()
     }
 
-    /// 全部收藏，最近收藏在前；单行来源或维度失效时跳过该行，不影响其余内容。
+    /// 全部收藏，最近收藏在前；来源已不存在的行跳过，不影响其余内容。
     func entries() throws -> [Bookmark] {
         let rows = try modelContext.fetch(
             FetchDescriptor<StoredBookmark>(
@@ -62,12 +62,12 @@ actor BookmarkPersistence {
         try modelContext.save()
     }
 
-    /// 删除某个维度的全部收藏（书架分组右侧的「清除」）。
-    func removeAll(kind: BookmarkKind) throws {
-        let rawKind = kind.rawValue
+    /// 删除某个来源的全部收藏（书架分组右侧的「清除」）。
+    func removeAll(sourceID: ComicSourceID) throws {
+        let rawSourceID = sourceID.rawValue
         try modelContext.delete(
             model: StoredBookmark.self,
-            where: #Predicate { $0.kind == rawKind },
+            where: #Predicate { $0.sourceID == rawSourceID },
         )
         try modelContext.save()
     }

@@ -29,6 +29,14 @@ struct BikaComicDetail: ComicDetailContentProviding, Sendable {
         contributors.map(\.name)
     }
 
+    /// 分类在前、标签在后；两者都来自本源详情响应，空组由展示层跳过。
+    var tagGroups: [ComicTagGroup] {
+        [
+            ComicTagGroup(kind: .category, values: categories.map(\.title)),
+            ComicTagGroup(kind: .tag, values: tags),
+        ]
+    }
+
     /// 只提供哔咔详情需要展示的统计、图片数量、创建日期和连载状态。
     var metadata: ComicDetailMetadata {
         ComicDetailMetadata(

@@ -26,15 +26,24 @@ struct ShenshiComicDetailView: View {
                     shell.navigator.push(ShenshiRoute.publisherComics(publisher))
                 }
             },
-            onSelectCategory: { _, navigation, _ in
-                if let category = navigation?.category {
-                    shell.navigator.push(ShenshiRoute.categoryComics(category))
-                }
-            },
-            onSelectTag: { _, navigation, name in
-                guard let tag = navigation?.comicTags.first(where: { $0.name == name }) else { return }
+            onSelectTag: { _, navigation, kind, name in
+                switch kind {
+                case .category:
+                    if let category = navigation?.category {
+                        shell.navigator.push(ShenshiRoute.categoryComics(category))
+                    }
 
-                shell.navigator.push(ShenshiRoute.tagComics(tag))
+                case .tag:
+                    // 公共层传入的是清理过空白的展示名；网页标签名可能带首尾空白，两侧都 trim 后再匹配。
+                    guard let tag = navigation?.comicTags.first(where: {
+                        $0.name.trimmingCharacters(in: .whitespacesAndNewlines) == name
+                    }) else { return }
+
+                    shell.navigator.push(ShenshiRoute.tagComics(tag))
+
+                default:
+                    break
+                }
             },
             copyContentProvider: {
                 let url = try await services.detailPageURL(comicID: identity.comicID)
@@ -76,7 +85,6 @@ struct ShenshiComicDetailView: View {
         )
         let snapshot = try DownloadedComicDetailSnapshot(
             detail: sourceDetail,
-            categories: sourceDetail.category.map { [$0.title] } ?? [],
             sourceNavigationData: JSONEncoder().encode(navigation),
             showsChaptersButton: false,
         )

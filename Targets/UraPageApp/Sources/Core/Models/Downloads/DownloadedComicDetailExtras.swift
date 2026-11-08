@@ -3,11 +3,15 @@ import Foundation
 /// 离线详情中不投影到作品行列的字段。
 ///
 /// 作品行只保留列表、调度与检索直接读取的列（身份／标题／作者／标签／分类／封面引用／状态投影）；
-/// 元信息、简介与来源跳转值这部分在入队时随作品行一起写入，
+/// 元信息、简介、标签组与来源跳转值这部分在入队时随作品行一起写入，
 /// 读取时与行列、章节行组装为 `DownloadedComicDetailSnapshot`，不单独更新。
 struct DownloadedComicDetailExtras: Codable, Hashable, Sendable {
     let metadata: ComicDetailMetadata
     let summary: String
+
+    /// 详情页的标签组（分类、标签、角色……）；作品行的标签／分类列只留给检索谓词。
+    let tagGroups: [ComicTagGroup]
+
     let sourceNavigationData: Data
     let showsChaptersButton: Bool
 
@@ -15,6 +19,7 @@ struct DownloadedComicDetailExtras: Codable, Hashable, Sendable {
     init(snapshot: DownloadedComicDetailSnapshot) {
         metadata = snapshot.metadata
         summary = snapshot.summary
+        tagGroups = snapshot.tagGroups
         sourceNavigationData = snapshot.sourceNavigationData
         showsChaptersButton = snapshot.showsChaptersButton
     }

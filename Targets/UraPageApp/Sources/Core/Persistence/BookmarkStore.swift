@@ -24,9 +24,9 @@ actor BookmarkStore {
         try await persistence().remove(bookmark)
     }
 
-    /// 删除某个维度的全部收藏。
-    func removeAll(kind: BookmarkKind) async throws {
-        try await persistence().removeAll(kind: kind)
+    /// 删除某个来源的全部收藏。
+    func removeAll(sourceID: ComicSourceID) async throws {
+        try await persistence().removeAll(sourceID: sourceID)
     }
 
     private func persistence() async throws -> BookmarkPersistence {

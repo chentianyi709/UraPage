@@ -77,8 +77,6 @@ extension DownloadPersistence {
                 identity: comic,
                 title: work.title,
                 authorNames: work.authors,
-                tags: work.tags,
-                categories: work.categories,
                 cover: downloadedCover(source: coverSource, isAvailable: work.coverState == .completed),
                 extras: extras,
             ),

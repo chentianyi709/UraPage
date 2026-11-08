@@ -10,17 +10,17 @@ enum BookmarksDisplayError: Equatable, Sendable {
     }
 }
 
-/// 书架「书签」页的一组内容：同一维度的收藏，组内保持最近收藏在前。
+/// 书架「书签」页的一组内容：同一来源的收藏（作者／分类／标签混排），组内保持最近收藏在前。
 struct BookmarksSection: Identifiable {
-    let kind: BookmarkKind
+    let sourceID: ComicSourceID
     let entries: [Bookmark]
 
     var id: String {
-        kind.rawValue
+        sourceID.rawValue
     }
 }
 
-/// 书架「书签」页的状态：读取全部收藏并按维度分组，删除时本地先动、失败再重读。
+/// 书架「书签」页的状态：读取全部收藏并按来源分组，删除时本地先动、失败再重读。
 @Observable
 @MainActor
 final class BookmarksViewModel {
@@ -28,6 +28,7 @@ final class BookmarksViewModel {
     private(set) var loadState: InitialLoadState<BookmarksDisplayError> = .idle
 
     @ObservationIgnored private let store: BookmarkStore
+
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
 
@@ -81,8 +82,11 @@ final class BookmarksViewModel {
         invalidateInFlightLoads()
         withAnimation(.snappy) {
             sections = sections.compactMap { section in
-                let entries = section.entries.filter { $0 != bookmark }
-                return entries.isEmpty ? nil : BookmarksSection(kind: section.kind, entries: entries)
+                // 按身份键过滤：payload 不参与身份，重收藏后两者可能不同。
+                let entries = section.entries.filter { $0.identityKey != bookmark.identityKey }
+                return entries.isEmpty
+                    ? nil
+                    : BookmarksSection(sourceID: section.sourceID, entries: entries)
             }
         }
 
@@ -100,19 +104,19 @@ final class BookmarksViewModel {
         }
     }
 
-    /// 清空一个维度：先带动画整组移除（下方分组上移补位），再落盘；失败提示并重读。
-    func clear(_ kind: BookmarkKind) {
+    /// 清空一个来源：先带动画整组移除（下方分组上移补位），再落盘；失败提示并重读。
+    func clear(sourceID: ComicSourceID) {
         invalidateInFlightLoads()
         withAnimation(.snappy) {
-            sections.removeAll { $0.kind == kind }
+            sections.removeAll { $0.sourceID == sourceID }
         }
 
         Task {
             do {
-                try await store.removeAll(kind: kind)
+                try await store.removeAll(sourceID: sourceID)
             } catch {
                 AppLogger.warning(
-                    "书签分组清除失败，kind=\(kind.rawValue) errorType=\(type(of: error))",
+                    "书签分组清除失败，source=\(sourceID.rawValue) errorType=\(type(of: error))",
                     category: "Bookmarks",
                 )
                 ToastCenter.shared.show("清除失败，请稍后重试", type: .error)
@@ -128,11 +132,21 @@ final class BookmarksViewModel {
         generation &+= 1
     }
 
-    /// 按维度分组；空维度不出现，顺序固定为作者／分类／标签。
+    /// 按来源分组，组序取「最近收藏先出现」的首次出现顺序；实际展示顺序由页面按来源 Tab 顺序排。
     private static func group(_ entries: [Bookmark]) -> [BookmarksSection] {
-        BookmarkKind.allCases.compactMap { kind in
-            let entries = entries.filter { $0.kind == kind }
-            return entries.isEmpty ? nil : BookmarksSection(kind: kind, entries: entries)
+        var order: [ComicSourceID] = []
+        var grouped: [ComicSourceID: [Bookmark]] = [:]
+
+        for entry in entries {
+            if grouped[entry.sourceID] == nil {
+                order.append(entry.sourceID)
+            }
+
+            grouped[entry.sourceID, default: []].append(entry)
+        }
+
+        return order.compactMap { sourceID in
+            grouped[sourceID].map { BookmarksSection(sourceID: sourceID, entries: $0) }
         }
     }
 }

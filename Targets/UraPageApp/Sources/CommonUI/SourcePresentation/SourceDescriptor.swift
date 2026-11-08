@@ -19,6 +19,19 @@ struct SourceDescriptor: Hashable, Sendable {
 
     /// 来源 Logo 的呈现方式；由 `SourceLogoView` 统一渲染。
     let logo: SourceLogo
+
+    /// 本源支持的书签维度目录（分类／标签／作者／角色……）。
+    ///
+    /// 与详情页的 `tagGroups` 使用同一批 `ComicTagKind` 常量：书签只落库维度 id，
+    /// 标题与图标在展示时由这里解析；未登记的维度由展示层退回标识本身。
+    let tagKinds: [ComicTagKind]
+}
+
+extension SourceDescriptor {
+    /// 按标识查本源登记过的维度；未登记返回 `nil`，由展示层用 `ComicTagKind.unknown(_:)` 兜底。
+    func tagKind(id: String) -> ComicTagKind? {
+        tagKinds.first { $0.id == id }
+    }
 }
 
 extension EnvironmentValues {

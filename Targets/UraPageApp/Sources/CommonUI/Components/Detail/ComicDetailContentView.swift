@@ -4,7 +4,7 @@ import SwiftUI
 /// 详情页公共内容：顶部通栏封面（含下拉放大与底部渐变）＋标题＋作者与字段行＋阅读入口＋分区内容。
 ///
 /// 版式与旧项目 `ComicDetailContentView` 一致：封面是固定高度的顶部 hero，标题与元信息在下方 12pt 边距内，
-/// 分区间距 18。只负责“拿数据来画”：不取数、不决定路由；作者／分类／标签与阅读入口只保留回调。
+/// 分区间距 18。只负责“拿数据来画”：不取数、不决定路由；作者／标签组与阅读入口只保留回调。
 /// 阅读进度由页面 owner 提供真实快照与动作；未提供时展示普通「开始阅读」。
 struct ComicDetailContentView<Related: View>: View {
     /// 详情展示快照；在线与离线共用同一份具体值。
@@ -25,11 +25,8 @@ struct ComicDetailContentView<Related: View>: View {
     /// 作者名点击（下标＋名称）。
     let onSelectAuthorName: (Int, String) -> Void
 
-    /// 分类点击。
-    let onSelectCategory: (String) -> Void
-
-    /// 标签点击。
-    let onSelectTag: (String) -> Void
+    /// 标签组点击：参数是来源给的维度与清理过空白的展示名。
+    let onSelectTag: (ComicTagKind, String) -> Void
 
     /// 点击作品 ID 时生成复制内容；`nil` 表示不显示复制入口。
     let copyContentProvider: ComicDetailCopyProvider?
@@ -45,8 +42,7 @@ struct ComicDetailContentView<Related: View>: View {
         hasMultipleChapters: Bool = false,
         onContinueReading: (() -> Void)? = nil,
         onSelectAuthorName: @escaping (Int, String) -> Void,
-        onSelectCategory: @escaping (String) -> Void,
-        onSelectTag: @escaping (String) -> Void,
+        onSelectTag: @escaping (ComicTagKind, String) -> Void,
         copyContentProvider: ComicDetailCopyProvider? = nil,
         @ContentBuilder related: @escaping () -> Related,
     ) {
@@ -56,7 +52,6 @@ struct ComicDetailContentView<Related: View>: View {
         self.hasMultipleChapters = hasMultipleChapters
         self.onContinueReading = onContinueReading
         self.onSelectAuthorName = onSelectAuthorName
-        self.onSelectCategory = onSelectCategory
         self.onSelectTag = onSelectTag
         self.copyContentProvider = copyContentProvider
         self.related = related
@@ -113,15 +108,11 @@ struct ComicDetailContentView<Related: View>: View {
                             }
                         }
 
-                        if !visibleCategories.isEmpty {
-                            ComicDetailSection(title: "分类", systemImage: "square.grid.2x2") {
-                                ComicCapsuleList(values: visibleCategories, onSelect: onSelectCategory)
-                            }
-                        }
-
-                        if !visibleTags.isEmpty {
-                            ComicDetailSection(title: "标签", systemImage: "tag.fill") {
-                                ComicCapsuleList(values: visibleTags, onSelect: onSelectTag)
+                        ForEach(visibleTagGroups) { group in
+                            ComicDetailSection(title: group.kind.title, systemImage: group.kind.systemImage) {
+                                ComicCapsuleList(values: group.values) { value in
+                                    onSelectTag(group.kind, value)
+                                }
                             }
                         }
 
@@ -183,7 +174,7 @@ struct ComicDetailContentView<Related: View>: View {
 
     // MARK: - 过滤
 
-    /// 去除来源值两端空白，并跳过没有可见内容的分类或标签。
+    /// 去除来源值两端空白，并跳过没有可见内容的值。
     private func visibleValues(_ values: [String]) -> [String] {
         values.compactMap { value in
             let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -191,12 +182,16 @@ struct ComicDetailContentView<Related: View>: View {
         }
     }
 
-    private var visibleCategories: [String] {
-        visibleValues(detail.categories)
-    }
-
-    private var visibleTags: [String] {
-        visibleValues(detail.tags)
+    /// 过滤空值并丢掉整组为空的分组；组序与来源给的一致。
+    private var visibleTagGroups: [ComicTagGroup] {
+        assert(
+            Set(detail.tagGroups.map(\.kind.id)).count == detail.tagGroups.count,
+            "详情标签组出现重复维度：同一来源同一维度只能有一组，否则会撞 ForEach 身份",
+        )
+        return detail.tagGroups.compactMap { group in
+            let values = visibleValues(group.values)
+            return values.isEmpty ? nil : ComicTagGroup(kind: group.kind, values: values)
+        }
     }
 }
 
@@ -209,8 +204,7 @@ extension ComicDetailContentView where Related == EmptyView {
         hasMultipleChapters: Bool = false,
         onContinueReading: (() -> Void)? = nil,
         onSelectAuthorName: @escaping (Int, String) -> Void,
-        onSelectCategory: @escaping (String) -> Void,
-        onSelectTag: @escaping (String) -> Void,
+        onSelectTag: @escaping (ComicTagKind, String) -> Void,
         copyContentProvider: ComicDetailCopyProvider? = nil,
     ) {
         self.init(
@@ -220,7 +214,6 @@ extension ComicDetailContentView where Related == EmptyView {
             hasMultipleChapters: hasMultipleChapters,
             onContinueReading: onContinueReading,
             onSelectAuthorName: onSelectAuthorName,
-            onSelectCategory: onSelectCategory,
             onSelectTag: onSelectTag,
             copyContentProvider: copyContentProvider,
             related: { EmptyView() },

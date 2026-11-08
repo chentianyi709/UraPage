@@ -7,6 +7,9 @@ protocol ComicDetailContentProviding: Sendable {
     var authorNames: [String] { get }
     var metadata: ComicDetailMetadata { get }
     var summary: String { get }
-    var tags: [String] { get }
+
+    /// 详情页展示的标签组：组数与顺序由来源决定（分类、标签、角色……），空组由展示层跳过。
+    var tagGroups: [ComicTagGroup] { get }
+
     var cover: ComicImageSource { get }
 }

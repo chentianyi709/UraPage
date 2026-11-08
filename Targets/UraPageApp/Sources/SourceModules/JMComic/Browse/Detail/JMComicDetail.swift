@@ -37,6 +37,11 @@ struct JMComicDetail: ComicDetailContentProviding {
         authors
     }
 
+    /// 禁漫详情只有一组标签，没有分类页。
+    var tagGroups: [ComicTagGroup] {
+        [ComicTagGroup(kind: .tag, values: tags)]
+    }
+
     /// 向统一字段行提供禁漫需要展示的统计、日期与图片数量（服务端返回 `total_photos` 时）。
     var metadata: ComicDetailMetadata {
         ComicDetailMetadata(
