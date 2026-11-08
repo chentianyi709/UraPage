@@ -12,6 +12,7 @@ import SwiftUI
 struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: View {
     @Environment(\.readerProgressRecorder) private var progressRecorder
     @Environment(\.downloadManager) private var downloadManager
+    @Environment(\.appShell) private var shell
 
     /// 详情身份与在线／离线模式；离线只读下载快照。
     let identity: ComicIdentity
@@ -132,7 +133,10 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
                 },
             )
         }
-        .comicDetailChrome(title: model?.value?.detail.title)
+        .comicDetailChrome(
+            title: model?.value?.detail.title,
+            menuActions: menuActions,
+        )
         .toolbar(content: makeBottomToolbar)
         .toolbarVisibility(shouldShowBottomBar ? .visible : .hidden, for: .bottomBar)
         .comicDetailChapterPicker(
@@ -195,6 +199,41 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
                 try await loadPresentation(identity)
             }
         }
+    }
+
+    /// 离线详情的「查看在线详情」：把同一作品按在线模式再 push 一层，返回即回到离线页。
+    ///
+    /// 走公共跨来源入口，由目标来源自己解析成本源路由；未登录来源的登录门禁在
+    /// destination 边界生效（在线路由不再声明 `usesLocalAssetsOnly`），页面不重复判断。
+    private func openOnlineDetail() {
+        do {
+            try shell.navigator.open(.detail(identity))
+        } catch {
+            AppLogger.error(
+                "在线详情路由失败，errorType=\(String(reflecting: type(of: error)))",
+                category: logCategory,
+            )
+            ToastCenter.shared.show("无法打开在线详情", type: .error)
+        }
+    }
+
+    /// 详情页工具栏「更多操作」：按内容模式组装当前可用动作。
+    ///
+    /// 目前只有离线详情有动作，在线详情数组为空、工具栏不显示更多按钮。
+    /// 菜单只放当前作品／来源的次要操作，不重复底栏与内容区入口；不可用动作直接不加入数组。
+    /// 破坏性动作标 `isDestructive`，由页面自己在动作里做二次确认。
+    private var menuActions: [ComicDetailMenuAction] {
+        guard mode == .offline else { return [] }
+
+        return [
+            ComicDetailMenuAction(
+                title: "查看在线详情",
+                systemImage: "globe",
+                action: {
+                    openOnlineDetail()
+                },
+            ),
+        ]
     }
 
     private func openReader(
