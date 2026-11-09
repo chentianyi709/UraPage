@@ -14,8 +14,8 @@ struct BikaComicDetail: ComicDetailContentProviding, Sendable {
     let isLiked: Bool
     let isFinished: Bool
 
-    /// 服务端 `created_at` 解析后的本地日期文本；无法解析时为 `nil`。
-    let publishedDateText: String?
+    /// 服务端 `updated_at` 解析后的本地日期文本；无法解析时为 `nil`。
+    let updatedDateText: String?
 
     let chapters: [BikaComicChapter]
 
@@ -43,7 +43,7 @@ struct BikaComicDetail: ComicDetailContentProviding, Sendable {
             .viewCount(viewCount),
             .likeCount(likeCount),
             .pageCount(pageCount),
-            publishedDateText.flatMap(ComicDetailField.publishedDate),
+            updatedDateText.flatMap(ComicDetailField.updatedDate),
             .serialization(isFinished: isFinished),
         ].compactMap(\.self)
     }

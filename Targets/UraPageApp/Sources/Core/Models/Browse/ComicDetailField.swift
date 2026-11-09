@@ -43,12 +43,26 @@ extension ComicDetailField {
 
     /// 发布日期；空白视为来源未提供。
     static func publishedDate(_ text: String) -> Self? {
+        date(text, accessibilityLabel: "发布日期")
+    }
+
+    /// 更新日期（作品最后更新时间）；空白视为来源未提供。
+    static func updatedDate(_ text: String) -> Self? {
+        date(text, accessibilityLabel: "更新时间")
+    }
+
+    /// 日期类字段的统一格式：去掉两端空白，空值不产出字段；读屏用「标签＋日期」。
+    private static func date(_ text: String, accessibilityLabel: String) -> Self? {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else {
             return nil
         }
 
-        return Self(value: trimmedText, systemImage: "calendar", accessibilityText: "发布日期 \(trimmedText)")
+        return Self(
+            value: trimmedText,
+            systemImage: "calendar",
+            accessibilityText: "\(accessibilityLabel) \(trimmedText)",
+        )
     }
 
     /// 连载状态。
