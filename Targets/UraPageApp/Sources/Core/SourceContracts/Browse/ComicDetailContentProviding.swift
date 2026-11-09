@@ -5,7 +5,8 @@ protocol ComicDetailContentProviding: Sendable {
     var identity: ComicIdentity { get }
     var title: String { get }
     var authorNames: [String] { get }
-    var metadata: ComicDetailMetadata { get }
+    /// 详情字段行：展示哪些字段、什么顺序由来源决定（浏览量、点赞、评分……），空数组时不显示字段。
+    var fields: [ComicDetailField] { get }
     var summary: String { get }
 
     /// 详情页展示的标签组：组数与顺序由来源决定（分类、标签、角色……），空组由展示层跳过。

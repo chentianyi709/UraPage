@@ -29,10 +29,17 @@ actor BookmarkPersistence {
     }
 
     /// 全部收藏，最近收藏在前；来源已不存在的行跳过，不影响其余内容。
+    ///
+    /// 不分批：书签量级有限，一次取完交给 `LazyVStack` 只构建可见胶囊，
+    /// 比维护游标、跨页写入与续载失败简单得多。
     func entries() throws -> [Bookmark] {
         let rows = try modelContext.fetch(
             FetchDescriptor<StoredBookmark>(
-                sortBy: [SortDescriptor(\.savedAt, order: .reverse)],
+                sortBy: [
+                    SortDescriptor(\.savedAt, order: .reverse),
+                    // 同一时刻收藏的两条按身份键定序，避免每次读取顺序抖动。
+                    SortDescriptor(\.identityKey, order: .reverse),
+                ],
             ),
         )
         let bookmarks = rows.compactMap(\.bookmark)

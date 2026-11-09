@@ -72,7 +72,7 @@ struct ComicDetailContentView<Related: View>: View {
 
                     ComicDetailMetadataSection(
                         authorNames: detail.authorNames,
-                        metadata: detail.metadata,
+                        fields: detail.fields,
                         comicID: detail.identity.comicID,
                         copyContentProvider: copyContentProvider,
                         onSelectAuthorName: onSelectAuthorName,

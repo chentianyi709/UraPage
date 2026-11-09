@@ -11,7 +11,7 @@ struct DownloadedComicDetailSnapshot: ComicDetailContentProviding, Hashable {
     let identity: ComicIdentity
     let title: String
     let authorNames: [String]
-    let metadata: ComicDetailMetadata
+    let fields: [ComicDetailField]
     let summary: String
     let tagGroups: [ComicTagGroup]
     let cover: ComicImageSource
@@ -26,7 +26,7 @@ struct DownloadedComicDetailSnapshot: ComicDetailContentProviding, Hashable {
         identity = detail.identity
         title = detail.title
         authorNames = detail.authorNames
-        metadata = detail.metadata
+        fields = detail.fields
         summary = detail.summary
         tagGroups = detail.tagGroups
         cover = detail.cover
@@ -46,7 +46,7 @@ struct DownloadedComicDetailSnapshot: ComicDetailContentProviding, Hashable {
             identity: identity,
             title: title,
             authorNames: authorNames,
-            metadata: extras.metadata,
+            fields: extras.fields,
             summary: extras.summary,
             tagGroups: extras.tagGroups,
             cover: cover,
@@ -59,7 +59,7 @@ struct DownloadedComicDetailSnapshot: ComicDetailContentProviding, Hashable {
         identity: ComicIdentity,
         title: String,
         authorNames: [String],
-        metadata: ComicDetailMetadata,
+        fields: [ComicDetailField],
         summary: String,
         tagGroups: [ComicTagGroup],
         cover: ComicImageSource,
@@ -69,7 +69,7 @@ struct DownloadedComicDetailSnapshot: ComicDetailContentProviding, Hashable {
         self.identity = identity
         self.title = title
         self.authorNames = authorNames
-        self.metadata = metadata
+        self.fields = fields
         self.summary = summary
         self.tagGroups = tagGroups
         self.cover = cover

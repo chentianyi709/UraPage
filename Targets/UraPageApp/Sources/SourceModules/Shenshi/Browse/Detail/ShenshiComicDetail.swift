@@ -24,8 +24,8 @@ struct ShenshiComicDetail: ComicDetailContentProviding {
         ]
     }
 
-    /// 向统一字段行提供绅士网页真实拥有的图片数量。
-    var metadata: ComicDetailMetadata {
-        ComicDetailMetadata(pageCount: pageCount)
+    /// 绅士网页只提供图片数量。
+    var fields: [ComicDetailField] {
+        [pageCount.map(ComicDetailField.pageCount)].compactMap(\.self)
     }
 }

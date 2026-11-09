@@ -49,9 +49,10 @@ struct BookmarksView: View {
         }
         .onAppear {
             // 首次出现由 `.task` 创建并加载；这里只处理从二级页返回时的新增收藏。
-            guard isActive, model != nil else { return }
+            // 首次挂载时两边可能同时到达，加载在途就不再排一次全量读取。
+            guard isActive, let model, model.loadState != .loading else { return }
 
-            model?.refresh()
+            model.refresh()
         }
     }
 
@@ -162,7 +163,7 @@ private struct BookmarkCapsuleList: View {
             horizontalSpacing: 8,
             verticalSpacing: 8,
         ) {
-            ForEach(entries, id: \.self) { bookmark in
+            ForEach(entries, id: \.identityKey) { bookmark in
                 let kind = kind(for: bookmark)
 
                 Button {

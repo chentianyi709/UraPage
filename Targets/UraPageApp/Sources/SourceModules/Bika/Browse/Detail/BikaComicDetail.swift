@@ -37,14 +37,14 @@ struct BikaComicDetail: ComicDetailContentProviding, Sendable {
         ]
     }
 
-    /// 只提供哔咔详情需要展示的统计、图片数量、创建日期和连载状态。
-    var metadata: ComicDetailMetadata {
-        ComicDetailMetadata(
-            viewCount: viewCount,
-            likeCount: likeCount,
-            publishedDateText: publishedDateText,
-            pageCount: pageCount,
-            serializationStatus: isFinished ? .completed : .serializing,
-        )
+    /// 浏览、点赞、图片、日期与连载状态，顺序即展示顺序。
+    var fields: [ComicDetailField] {
+        [
+            .viewCount(viewCount),
+            .likeCount(likeCount),
+            .pageCount(pageCount),
+            publishedDateText.flatMap(ComicDetailField.publishedDate),
+            .serialization(isFinished: isFinished),
+        ].compactMap(\.self)
     }
 }
