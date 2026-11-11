@@ -19,6 +19,9 @@ extension DownloadPersistence {
                 let snapshot = comicRequests[0].comicSnapshot
                 let coverReferenceData = try encoder.encode(snapshot.cover)
                 let detailExtrasData = try encoder.encode(DownloadedComicDetailExtras(snapshot: snapshot))
+                // 作品行的标签／分类列只服务检索谓词：只取这两个标准维度，其余维度只进 extras、不参与下载检索。
+                let tags = snapshot.tagGroups.first { $0.kind == .tag }?.values ?? []
+                let categories = snapshot.tagGroups.first { $0.kind == .category }?.values ?? []
                 let existingWork = try fetchWork(key: workKey)
 
                 if let work = existingWork {
@@ -33,8 +36,8 @@ extension DownloadPersistence {
                     }
                     work.title = snapshot.title
                     work.authors = snapshot.authorNames
-                    work.tags = snapshot.tags
-                    work.categories = snapshot.categories
+                    work.tags = tags
+                    work.categories = categories
                     work.coverReferenceData = coverReferenceData
                     work.detailExtrasData = detailExtrasData
                 } else {
@@ -43,8 +46,8 @@ extension DownloadPersistence {
                             identity: comic,
                             title: snapshot.title,
                             authors: snapshot.authorNames,
-                            tags: snapshot.tags,
-                            categories: snapshot.categories,
+                            tags: tags,
+                            categories: categories,
                             coverReferenceData: coverReferenceData,
                             detailExtrasData: detailExtrasData,
                             coverState: Self.initialCoverState(for: snapshot.cover),

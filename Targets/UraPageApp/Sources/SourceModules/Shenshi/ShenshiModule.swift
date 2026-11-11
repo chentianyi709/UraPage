@@ -15,7 +15,12 @@ struct ShenshiModule: SourceExperienceModule {
 
     /// 来源展示信息；绅士暂无 Logo 资源。
     var descriptor: SourceDescriptor {
-        SourceDescriptor(sourceID: services.sourceID, displayName: "绅士漫画", logo: .drawn(monogram: "绅"))
+        SourceDescriptor(
+            sourceID: services.sourceID,
+            displayName: "绅士漫画",
+            logo: .drawn(monogram: "绅"),
+            tagKinds: [.author, .category, .tag],
+        )
     }
 
     /// 绅士账号访问事实；供根页面头像按登录态着色。
@@ -64,13 +69,16 @@ struct ShenshiModule: SourceExperienceModule {
 
     /// 把收藏的书签还原成本源列表页：payload 是本源收藏时编码的 typed 值。
     func resolve(_ bookmark: Bookmark) throws -> ShenshiRoute {
-        switch bookmark.kind {
-        case .category:
+        switch bookmark.kindID {
+        case ComicTagKind.category.id:
             try .categoryComics(bookmark.decoded(ShenshiLatestCategory.self))
-        case .tag:
+        case ComicTagKind.tag.id:
             try .tagComics(bookmark.decoded(ShenshiComicTag.self))
-        case .author:
+        case ComicTagKind.author.id:
             try .publisherComics(bookmark.decoded(ShenshiComicPublisher.self))
+        default:
+            // 本源没有这个维度的列表页（例如来源升级后移除的维度）。
+            throw ComicSourceError.invalidIdentity
         }
     }
 }

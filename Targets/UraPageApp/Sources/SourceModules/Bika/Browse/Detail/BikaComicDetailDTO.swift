@@ -35,6 +35,12 @@ struct BikaComicDetailDTO: Decodable, ReerCodableDelegate, Sendable {
     let totalViews: Int
     let isLiked: Bool
 
+    /// 作品最后更新时间；详情字段行的日期展示它。
+    @CodingKey("updated_at")
+    let updatedAt: String?
+
+    /// 作品创建时间；当前没有展示位置，按开发者要求先保留解码，
+    /// 免得以后要用时还要回头补 DTO（接口已经返回，取用成本为零）。
     @CodingKey("created_at")
     let createdAt: String?
 }

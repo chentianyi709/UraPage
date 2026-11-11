@@ -14,8 +14,8 @@ struct BikaComicDetail: ComicDetailContentProviding, Sendable {
     let isLiked: Bool
     let isFinished: Bool
 
-    /// 服务端 `created_at` 解析后的本地日期文本；无法解析时为 `nil`。
-    let publishedDateText: String?
+    /// 服务端 `updated_at` 解析后的本地日期文本；无法解析时为 `nil`。
+    let updatedDateText: String?
 
     let chapters: [BikaComicChapter]
 
@@ -29,14 +29,22 @@ struct BikaComicDetail: ComicDetailContentProviding, Sendable {
         contributors.map(\.name)
     }
 
-    /// 只提供哔咔详情需要展示的统计、图片数量、创建日期和连载状态。
-    var metadata: ComicDetailMetadata {
-        ComicDetailMetadata(
-            viewCount: viewCount,
-            likeCount: likeCount,
-            publishedDateText: publishedDateText,
-            pageCount: pageCount,
-            serializationStatus: isFinished ? .completed : .serializing,
-        )
+    /// 分类在前、标签在后；两者都来自本源详情响应，空组由展示层跳过。
+    var tagGroups: [ComicTagGroup] {
+        [
+            ComicTagGroup(kind: .category, values: categories.map(\.title)),
+            ComicTagGroup(kind: .tag, values: tags),
+        ]
+    }
+
+    /// 浏览、点赞、图片、日期与连载状态，顺序即展示顺序。
+    var fields: [ComicDetailField] {
+        [
+            .viewCount(viewCount),
+            .likeCount(likeCount),
+            .pageCount(pageCount),
+            updatedDateText.flatMap(ComicDetailField.updatedDate),
+            .serialization(isFinished: isFinished),
+        ].compactMap(\.self)
     }
 }

@@ -8,6 +8,9 @@ import SwiftUI
 struct BookmarkButton: View {
     @Environment(\.bookmarkStore) private var store
 
+    /// 来源的书签维度目录：按钮只借它把维度标识翻译成展示名称。
+    @Environment(\.sourceDescriptor) private var descriptor
+
     /// 当前页面代表的那一条书签。
     let bookmark: Bookmark
 
@@ -24,7 +27,7 @@ struct BookmarkButton: View {
                 .foregroundStyle(isFavorite == true ? Color.brandPrimary : Color.textPrimary)
         }
         .accessibilityLabel(
-            "\(isFavorite == true ? "取消收藏" : "收藏")，\(bookmark.kind.title)：\(bookmark.displayName)",
+            "\(isFavorite == true ? "取消收藏" : "收藏")，\(kindTitle)：\(bookmark.displayName)",
         )
         .accessibilityAddTraits(isFavorite == true ? .isSelected : [])
         .sensoryFeedback(.impact(weight: .light), trigger: feedbackCount)
@@ -42,13 +45,18 @@ struct BookmarkButton: View {
                 guard !Task.isCancelled else { return }
 
                 AppLogger.warning(
-                    "书签收藏读取失败，source=\(bookmark.sourceID.rawValue) kind=\(bookmark.kind.rawValue) "
+                    "书签收藏读取失败，source=\(bookmark.sourceID.rawValue) kind=\(bookmark.kindID) "
                         + "errorType=\(type(of: error))",
                     category: "Bookmarks",
                 )
                 isFavorite = false
             }
         }
+    }
+
+    /// 维度名称：来源目录里有就用目录的，没有（来源已移除该维度）就退回标识本身。
+    private var kindTitle: String {
+        descriptor.tagKind(id: bookmark.kindID)?.title ?? ComicTagKind.unknown(bookmark.kindID).title
     }
 
     /// 点击即切换本地展示并落盘；失败回滚。

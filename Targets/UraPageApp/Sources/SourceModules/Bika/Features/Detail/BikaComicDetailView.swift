@@ -34,21 +34,30 @@ struct BikaComicDetailView: View {
                     BikaRoute.contributorComics(navigation.contributors[index]),
                 )
             },
-            onSelectCategory: { _, navigation, name in
-                // 胶囊只提供展示名称；路由携带当前详情给出的分类值。
-                guard let category = navigation?.categories.first(where: {
-                    $0.title.trimmingCharacters(in: .whitespacesAndNewlines) == name
-                }) else { return }
+            onSelectTag: { presentation, navigation, kind, name in
+                switch kind {
+                case .category:
+                    // 胶囊只提供展示名称；路由携带当前详情给出的分类值。
+                    guard let category = navigation?.categories.first(where: {
+                        $0.title.trimmingCharacters(in: .whitespacesAndNewlines) == name
+                    }) else { return }
 
-                shell.navigator.push(BikaRoute.categoryComics(category))
-            },
-            onSelectTag: { presentation, _, name in
-                // 公共胶囊会清理展示空白；请求仍使用详情响应的原始标签值。
-                guard let tag = presentation.detail.tags.first(where: {
-                    $0.trimmingCharacters(in: .whitespacesAndNewlines) == name
-                }) else { return }
+                    shell.navigator.push(BikaRoute.categoryComics(category))
 
-                shell.navigator.push(BikaRoute.tagComics(tag))
+                case .tag:
+                    // 公共胶囊会清理展示空白；请求仍使用详情响应的原始标签值。
+                    guard let tag = presentation.detail
+                        .tagGroups
+                        .first(where: { $0.kind == .tag })?
+                        .values
+                        .first(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines) == name })
+                    else { return }
+
+                    shell.navigator.push(BikaRoute.tagComics(tag))
+
+                default:
+                    break
+                }
             },
             copyContentProvider: nil,
             likeAction: ComicDetailLikeAction(allowsUnliking: true) { identity in
@@ -119,7 +128,6 @@ struct BikaComicDetailView: View {
         )
         let snapshot = try DownloadedComicDetailSnapshot(
             detail: sourceDetail,
-            categories: sourceDetail.categories.map(\.title),
             sourceNavigationData: JSONEncoder().encode(navigation),
             showsChaptersButton: sourceDetail.showsChaptersButton,
         )

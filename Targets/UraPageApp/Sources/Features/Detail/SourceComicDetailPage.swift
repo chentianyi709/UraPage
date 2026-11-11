@@ -27,11 +27,8 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
     /// 作者行点击：`index` 是来源作者数组下标，`name` 是展示名。
     let onSelectAuthor: (ComicDetailPresentation, Navigation?, Int, String) -> Void
 
-    /// 分类胶囊点击。
-    let onSelectCategory: (ComicDetailPresentation, Navigation?, String) -> Void
-
-    /// 标签胶囊点击。
-    let onSelectTag: (ComicDetailPresentation, Navigation?, String) -> Void
+    /// 标签组胶囊点击：维度由来源详情给出，名称是清理过空白的展示值。
+    let onSelectTag: (ComicDetailPresentation, Navigation?, ComicTagKind, String) -> Void
 
     /// 作品 ID 复制入口；`nil` 表示本源不提供复制。
     let copyContentProvider: ComicDetailCopyProvider?
@@ -65,8 +62,7 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
         loadPresentation: @escaping @Sendable (ComicIdentity) async throws -> ComicDetailPresentation,
         decodeNavigation: @escaping (DownloadedComicDetailSnapshot) throws -> Navigation,
         onSelectAuthor: @escaping (ComicDetailPresentation, Navigation?, Int, String) -> Void,
-        onSelectCategory: @escaping (ComicDetailPresentation, Navigation?, String) -> Void,
-        onSelectTag: @escaping (ComicDetailPresentation, Navigation?, String) -> Void,
+        onSelectTag: @escaping (ComicDetailPresentation, Navigation?, ComicTagKind, String) -> Void,
         copyContentProvider: ComicDetailCopyProvider?,
         likeAction: ComicDetailLikeAction? = nil,
         onOpenReader: @escaping (ComicReaderInput) -> Void,
@@ -79,7 +75,6 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
         self.loadPresentation = loadPresentation
         self.decodeNavigation = decodeNavigation
         self.onSelectAuthor = onSelectAuthor
-        self.onSelectCategory = onSelectCategory
         self.onSelectTag = onSelectTag
         self.copyContentProvider = copyContentProvider
         self.likeAction = likeAction
@@ -121,11 +116,8 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
                 onSelectAuthorName: { index, name in
                     onSelectAuthor(presentation, navigation, index, name)
                 },
-                onSelectCategory: { name in
-                    onSelectCategory(presentation, navigation, name)
-                },
-                onSelectTag: { name in
-                    onSelectTag(presentation, navigation, name)
+                onSelectTag: { kind, name in
+                    onSelectTag(presentation, navigation, kind, name)
                 },
                 copyContentProvider: copyContentProvider,
                 related: {

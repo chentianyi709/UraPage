@@ -63,15 +63,15 @@ func makeBikaComicDetail(
         likeCount: comic.totalLikes,
         isLiked: comic.isLiked,
         isFinished: comic.finished,
-        publishedDateText: makeBikaPublishedDateText(comic.createdAt),
+        updatedDateText: makeBikaUpdatedDateText(comic.updatedAt),
         chapters: chapters,
     )
 }
 
-/// 把详情接口的 ISO8601 创建时间（如 `2024-08-10T14:53:12.518Z`）转为与禁漫一致的本地日期文本。
-private func makeBikaPublishedDateText(_ createdAt: String?) -> String? {
-    guard let createdAt = nonemptyBikaDetailText(createdAt),
-          let date = bikaISO8601Date(from: createdAt)
+/// 把详情接口的 ISO8601 更新时间（如 `2026-11-08T18:07:12.588Z`）转为与禁漫一致的本地日期文本。
+private func makeBikaUpdatedDateText(_ updatedAt: String?) -> String? {
+    guard let updatedAt = nonemptyBikaDetailText(updatedAt),
+          let date = bikaISO8601Date(from: updatedAt)
     else {
         return nil
     }
