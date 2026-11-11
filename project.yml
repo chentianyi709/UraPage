@@ -68,8 +68,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: try.jiezhoue.UraPage
         PRODUCT_NAME: UraPage
         # 发布版本与构建号集中维护，Info.plist 只引用这两个值。
-        MARKETING_VERSION: "1.1.0"
-        CURRENT_PROJECT_VERSION: "2"
+        # 1.2.0：详情字段行改为来源可扩展的 ComicDetailField、书签只落库维度标识，
+        # 本地数据与 1.1.0 不兼容（旧库需重建），因此按功能增量升次版本号。
+        MARKETING_VERSION: "1.2.0"
+        CURRENT_PROJECT_VERSION: "3"
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
