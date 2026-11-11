@@ -55,6 +55,14 @@ extension Color {
     /// 分隔线与描边（浅色 #EBEBEB / 深色 #38383A）。
     static let divider = Color(light: 0xEBEBEB, dark: 0x38383A)
 
+    // MARK: - 提示气泡
+
+    /// 提示气泡底色：与正文反相的高对比表面（浅色 #1A1A1A / 深色 #F2F2F7）。
+    static let tooltipBackground = Color(light: 0x1A1A1A, dark: 0xF2F2F7)
+
+    /// 提示气泡文字（浅色 #FAFAFA / 深色 #1A1A1A）。
+    static let tooltipForeground = Color(light: 0xFAFAFA, dark: 0x1A1A1A)
+
     // MARK: - 品牌与语义色
 
     /// 品牌主色（浅色 #B71C1C / 深色 #E57373）：主要按钮与强调文本；
