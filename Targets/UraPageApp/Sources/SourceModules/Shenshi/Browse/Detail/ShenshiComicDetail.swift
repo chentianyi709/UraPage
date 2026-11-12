@@ -5,6 +5,7 @@ struct ShenshiComicDetail: ComicDetailContentProviding {
     let publisher: ShenshiComicPublisher?
     let category: ShenshiLatestCategory?
     let pageCount: Int?
+    let favoriteCount: Int?
     let commentCount: Int?
     let summary: String
     let comicTags: [ShenshiComicTag]
@@ -24,8 +25,11 @@ struct ShenshiComicDetail: ComicDetailContentProviding {
         ]
     }
 
-    /// 绅士网页只提供图片数量。
+    /// 绅士网页只提供图片数量与收藏数，顺序与页面上的排列一致。
     var fields: [ComicDetailField] {
-        [pageCount.map(ComicDetailField.pageCount)].compactMap(\.self)
+        [
+            pageCount.map(ComicDetailField.pageCount),
+            favoriteCount.map(ComicDetailField.favoriteCount),
+        ].compactMap(\.self)
     }
 }

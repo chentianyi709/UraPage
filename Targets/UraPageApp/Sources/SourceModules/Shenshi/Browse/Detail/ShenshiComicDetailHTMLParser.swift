@@ -21,12 +21,16 @@ enum ShenshiComicDetailHTMLParser {
                 throw ShenshiAPIError.invalidResponse
             }
 
+            // 图片数量与收藏数写在同一段副栏文案里：取样一次，两个提取函数读同一份。
+            let subInfoLines = try subInfoTexts(in: detailScope)
+
             return try ShenshiComicDetail(
                 identity: ComicIdentity(sourceID: .shenshi, comicID: comicID),
                 title: title,
                 publisher: publisher(in: detailScope),
                 category: category(in: detailScope),
-                pageCount: pageCount(in: detailScope),
+                pageCount: pageCount(from: subInfoLines),
+                favoriteCount: favoriteCount(from: subInfoLines),
                 commentCount: commentCount(in: document, comicID: comicID),
                 summary: summary(in: document),
                 comicTags: tags(in: document),
@@ -94,14 +98,34 @@ enum ShenshiComicDetailHTMLParser {
         return normalizedText(String(pageTitle[..<suffixRange.lowerBound]))
     }
 
-    /// 从 `11P` 这类移动版文案中提取图片数量，无法识别时保持缺失。
-    private static func pageCount(in scope: Element) throws -> Int? {
+    /// 副栏里可能带数字的文案：图片数量与收藏数都写在同一段。
+    ///
+    /// 主节点是 `.sub_r .date`，它缺失时退回整块 `.txtItme`。只在这里查一次 DOM，
+    /// 两个字段的提取函数都读这份文本，避免各查一遍。
+    private static func subInfoTexts(in scope: Element) throws -> [String] {
         let preferredText = try scope.select(".sub_r .date").first()?.text()
         let fallbackText = try scope.select(".sub_r .txtItme").text()
 
+        return [preferredText, fallbackText].compactMap(\.self)
+    }
+
+    /// 从 `11P` 这类移动版文案中提取图片数量，无法识别时保持缺失。
+    private static func pageCount(from texts: [String]) -> Int? {
         // 主节点存在但不包含图片数量时，继续尝试备用节点。
-        for case let value? in [preferredText, fallbackText] {
-            guard let match = value.firstMatch(of: #/([0-9][0-9,]*)\s*[Pp](?:\b|$)/#) else {
+        for text in texts {
+            guard let match = text.firstMatch(of: #/([0-9][0-9,]*)\s*[Pp](?:\b|$)/#) else {
+                continue
+            }
+
+            return Int(String(match.1).replacingOccurrences(of: ",", with: ""))
+        }
+        return nil
+    }
+
+    /// 从 `216P · 收藏 5` 里「收藏」后面的数字读收藏数；未登录也能读到这个公开计数。
+    private static func favoriteCount(from texts: [String]) -> Int? {
+        for text in texts {
+            guard let match = text.firstMatch(of: #/收藏数?\s*([0-9][0-9,]*)/#) else {
                 continue
             }
 
