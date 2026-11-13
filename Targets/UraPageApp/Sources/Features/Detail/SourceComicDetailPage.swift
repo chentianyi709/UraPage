@@ -53,8 +53,7 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
     @State private var isChaptersSheetPresented = false
     @State private var downloadController: ComicDownloadController?
     @State private var navigation: Navigation?
-    @State private var isLiking = false
-    @State private var likedOverride: Bool?
+    @State private var likeController: ComicDetailLikeController?
 
     init(
         identity: ComicIdentity,
@@ -174,6 +173,10 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
 
     /// 首次展示时创建页面状态 owner；重新进入详情复用同一实例。
     private func prepareModelIfNeeded() {
+        if likeController == nil, let likeAction {
+            likeController = ComicDetailLikeController(identity: identity, action: likeAction)
+        }
+
         guard model == nil else {
             return
         }
@@ -263,16 +266,10 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
 
     /// 底部操作栏：点赞动作由来源注入，其余未接入的写操作保持 `nil`。
     private func makeBottomToolbar() -> ComicDetailBottomToolbar {
-        let onLike: (() -> Void)? = if likeAction == nil {
-            nil
-        } else {
-            handleLikeTap
-        }
-
-        return ComicDetailBottomToolbar(
+        ComicDetailBottomToolbar(
             showsOnlineActions: mode == .online,
-            isLiked: likedOverride ?? model?.value?.isLiked ?? false,
-            isLiking: isLiking,
+            isLiked: isLiked,
+            isLiking: likeController?.isLiking ?? false,
             onLike: onLike,
             onFavorite: nil,
             onDownload: handleDownloadTap,
@@ -284,64 +281,19 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
         )
     }
 
-    /// 提交当前详情点赞；请求不随页面消失取消，但只把结果应用到同一作品。
-    private func handleLikeTap() {
-        guard !isLiking,
-              let likeAction,
-              let presentation = model?.value
-        else {
-            return
-        }
-
-        let identity = presentation.detail.identity
-        let isLiked = likedOverride ?? presentation.isLiked
-
-        // 不可取消点赞的来源在已点赞时只提示，不重复提交请求。
-        if !likeAction.allowsUnliking, isLiked {
-            ToastCenter.shared.show("已点赞", type: .info)
-            return
-        }
-
-        isLiking = true
-
-        Task {
-            defer { isLiking = false }
-
-            do {
-                let result = try await likeAction.perform(identity)
-                guard model?.value?.detail.identity == identity else { return }
-
-                applyLikeResult(result)
-            } catch is CancellationError {
-                return
-            } catch let error as ComicSourceError {
-                guard model?.value?.detail.identity == identity else { return }
-
-                ToastCenter.shared.show(
-                    SourceLoadDisplayError(error).message,
-                    type: .error,
-                )
-            } catch {
-                guard model?.value?.detail.identity == identity else { return }
-
-                ToastCenter.shared.show("点赞失败，请稍后重试", type: .error)
-            }
-        }
+    /// 当前点赞态：服务端确认过的覆盖值优先，否则用详情给出的值。
+    private var isLiked: Bool {
+        likeController?.likedOverride ?? model?.value?.isLiked ?? false
     }
 
-    /// 只采用服务端确认后的状态，并在成功、取消成功与业务拒绝间区分提示类型。
-    private func applyLikeResult(_ result: ComicDetailLikeResult) {
-        switch result {
-        case let .liked(message):
-            likedOverride = true
-            ToastCenter.shared.show(message ?? "点赞成功", type: .success)
+    /// 底栏点赞动作；来源没有接入点赞时不渲染按钮。
+    private var onLike: (() -> Void)? {
+        guard let likeController else {
+            return nil
+        }
 
-        case let .unliked(message):
-            likedOverride = false
-            ToastCenter.shared.show(message ?? "已取消点赞", type: .success)
-
-        case let .rejected(message):
-            ToastCenter.shared.show(message ?? "点赞失败", type: .warning)
+        return {
+            likeController.toggle(currentIsLiked: isLiked)
         }
     }
 
@@ -366,26 +318,3 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
 
 /// 没有额外详情导航身份的来源使用它（例如禁漫）。
 struct EmptyDetailNavigation: Decodable, Sendable {}
-
-/// 详情页点赞动作：来源声明是否支持取消点赞，并提交服务端确认的请求。
-struct ComicDetailLikeAction: Sendable {
-    /// 是否允许再次点击取消点赞。
-    ///
-    /// 为 `false` 时公共页面在已点赞状态下只提示「已点赞」，不发起请求；来源无需自行判断当前状态。
-    let allowsUnliking: Bool
-
-    /// 提交点赞或取消点赞；返回服务端确认后的结果。
-    let perform: @Sendable (ComicIdentity) async throws -> ComicDetailLikeResult
-}
-
-/// 详情页点赞动作的服务端确认结果。
-enum ComicDetailLikeResult: Sendable {
-    /// 服务端确认已点赞；`message` 为空时使用默认成功提示。
-    case liked(message: String?)
-
-    /// 服务端确认已取消点赞（仅可切换点赞的来源）。
-    case unliked(message: String?)
-
-    /// 服务端拒绝，点赞状态保持不变。
-    case rejected(message: String?)
-}

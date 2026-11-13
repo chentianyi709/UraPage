@@ -36,7 +36,7 @@ final class DownloadsExportModel {
         exportTask?.cancel()
         // 已完成但未分享的产物也随 owner 释放删除，避免临时目录留到下次启动清理。
         if let exportedDirectoryURL {
-            try? FileManager.default.removeItem(at: exportedDirectoryURL)
+            Self.removeExportDirectory(exportedDirectoryURL)
         }
     }
 
@@ -103,12 +103,22 @@ final class DownloadsExportModel {
     }
 
     /// 分享结束后清空产物并删除临时目录；重复调用无副作用。
+    ///
+    /// 目录里是整部作品的散图（数百个文件），删除放到后台执行：这一步发生在分享面板收起时，
+    /// 同步删会卡住主线程。
     func finishSharing() {
         archive = nil
         guard let exportedDirectoryURL else { return }
 
         self.exportedDirectoryURL = nil
-        try? FileManager.default.removeItem(at: exportedDirectoryURL)
+        Self.removeExportDirectory(exportedDirectoryURL)
+    }
+
+    /// 删除导出临时目录；失败无副作用（启动时还有残留清理兜底）。
+    private nonisolated static func removeExportDirectory(_ url: URL) {
+        Task.detached(priority: .utility) {
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     private func complete(_ archiveURL: URL) {
