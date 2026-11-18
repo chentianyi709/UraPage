@@ -150,6 +150,26 @@ struct BikaServices: ComicSourceRuntime, SourceHostSettingsProviding, Sendable {
         }
     }
 
+    /// 读取哔咔作品的一页顶级评论；子评论由评论行按需单独请求。
+    func comments(comicID: String, page: Int) async throws -> ComicCommentPage {
+        try await SourceServiceOperation.run(
+            failureMessage: "评论加载失败，id=\(comicID)",
+            category: "Bika.Comments",
+        ) {
+            try await client.comments(comicID: comicID, page: page)
+        }
+    }
+
+    /// 读取哔咔指定顶级评论的一页子评论。
+    func commentReplies(commentID: String, page: Int) async throws -> ComicCommentPage {
+        try await SourceServiceOperation.run(
+            failureMessage: "回复加载失败，commentID=\(commentID)",
+            category: "Bika.CommentReplies",
+        ) {
+            try await client.commentReplies(commentID: commentID, page: page)
+        }
+    }
+
     /// 切换哔咔作品点赞状态；返回服务端确认的最终状态，不本地取反猜测。
     func toggleComicLike(_ identity: ComicIdentity) async throws -> BikaComicLikeState {
         try await SourceServiceOperation.run(

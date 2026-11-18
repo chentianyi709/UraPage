@@ -41,6 +41,11 @@ struct JMComicDetailView: View {
                     ? .liked(message: message)
                     : .rejected(message: message)
             },
+            comments: ComicCommentsProvider(
+                loadPage: { page in
+                    try await services.comments(comicID: identity.comicID, page: page)
+                },
+            ),
             onOpenReader: { input in
                 shell.navigator.push(JMComicRoute.reader(input))
             },

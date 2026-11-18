@@ -3,7 +3,7 @@ import Foundation
 /// 禁漫来源模块的唯一公开入口，共享同一个稳定 Source Client。
 ///
 /// 已暴露浏览、详情、点赞、图片、章节、Host 与账号（登录/退出/资料）能力。
-/// TODO: 收藏同步、评论属于后续层。
+/// TODO: 收藏同步属于后续层。
 struct JMComicServices: ComicSourceRuntime, SourceHostSettingsProviding, Sendable {
     let sourceID = ComicSourceID.jm
 
@@ -169,6 +169,16 @@ struct JMComicServices: ComicSourceRuntime, SourceHostSettingsProviding, Sendabl
             category: "JM.Detail",
         ) {
             try await client.detail(comicID: identity.comicID)
+        }
+    }
+
+    /// 读取禁漫作品的一页评论；回复随顶级评论一起返回。
+    func comments(comicID: String, page: Int) async throws -> ComicCommentPage {
+        try await SourceServiceOperation.run(
+            failureMessage: "评论加载失败，id=\(comicID)",
+            category: "JM.Comments",
+        ) {
+            try await client.comments(comicID: comicID, page: page)
         }
     }
 

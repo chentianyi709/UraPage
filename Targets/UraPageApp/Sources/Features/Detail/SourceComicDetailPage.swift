@@ -36,6 +36,9 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
     /// 点赞动作；`nil` 表示本源未接入点赞（不显示按钮）。
     let likeAction: ComicDetailLikeAction?
 
+    /// 评论入口；`nil` 表示本源未接入评论（不显示按钮）。
+    let comments: ComicCommentsProvider?
+
     /// 打开 Reader；页面已根据当前展示解析好 `ComicReaderInput`。
     let onOpenReader: (ComicReaderInput) -> Void
 
@@ -54,6 +57,8 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
     @State private var downloadController: ComicDownloadController?
     @State private var navigation: Navigation?
     @State private var likeController: ComicDetailLikeController?
+    @State private var commentsController: ComicCommentsController?
+    @State private var isCommentsPresented = false
 
     init(
         identity: ComicIdentity,
@@ -64,6 +69,7 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
         onSelectTag: @escaping (ComicDetailPresentation, Navigation?, ComicTagKind, String) -> Void,
         copyContentProvider: ComicDetailCopyProvider?,
         likeAction: ComicDetailLikeAction? = nil,
+        comments: ComicCommentsProvider? = nil,
         onOpenReader: @escaping (ComicReaderInput) -> Void,
         onPresentationLoaded: ((ComicDetailPresentation) -> Void)? = nil,
         logCategory: String,
@@ -77,6 +83,7 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
         self.onSelectTag = onSelectTag
         self.copyContentProvider = copyContentProvider
         self.likeAction = likeAction
+        self.comments = comments
         self.onOpenReader = onOpenReader
         self.onPresentationLoaded = onPresentationLoaded
         self.logCategory = logCategory
@@ -141,6 +148,11 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
                 }
             },
         )
+        .sheet(isPresented: $isCommentsPresented) {
+            if let commentsController {
+                ComicCommentsSheet(controller: commentsController)
+            }
+        }
         .comicDetailDownload(
             controller: $downloadController,
             identity: identity,
@@ -175,6 +187,10 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
     private func prepareModelIfNeeded() {
         if likeController == nil, let likeAction {
             likeController = ComicDetailLikeController(identity: identity, action: likeAction)
+        }
+
+        if mode == .online, commentsController == nil, let comments {
+            commentsController = ComicCommentsController(provider: comments)
         }
 
         guard model == nil else {
@@ -276,7 +292,9 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
             onChapters: model?.value?.showsChapterEntry == true
                 ? { isChaptersSheetPresented = true }
                 : nil,
-            onComments: nil,
+            onComments: commentsController.map { _ in
+                { isCommentsPresented = true }
+            },
             downloadState: downloadController?.workState,
         )
     }

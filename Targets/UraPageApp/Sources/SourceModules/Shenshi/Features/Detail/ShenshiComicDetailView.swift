@@ -50,6 +50,11 @@ struct ShenshiComicDetailView: View {
                     successMessage: "已复制作品链接",
                 )
             },
+            comments: ComicCommentsProvider(
+                loadPage: { _ in
+                    try await services.comments(comicID: identity.comicID)
+                },
+            ),
             onOpenReader: { input in
                 shell.navigator.push(ShenshiRoute.reader(input))
             },

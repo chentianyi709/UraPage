@@ -68,6 +68,14 @@ struct BikaComicDetailView: View {
                     .unliked(message: nil)
                 }
             },
+            comments: ComicCommentsProvider(
+                loadPage: { page in
+                    try await services.comments(comicID: identity.comicID, page: page)
+                },
+                loadReplies: { commentID, page in
+                    try await services.commentReplies(commentID: commentID, page: page)
+                },
+            ),
             onOpenReader: { input in
                 shell.navigator.push(BikaRoute.reader(input))
             },
