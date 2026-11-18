@@ -102,7 +102,7 @@ struct ComicDetailContentView<Related: View>: View {
                         // 只由空行组成的简介清理后为空，不留一块空白的简介区。
                         if !TruncatableText.cleaned(detail.summary).isEmpty {
                             ComicDetailSection(title: "简介", systemImage: "text.alignleft") {
-                                TruncatableText(detail.summary, lineLimit: 2)
+                                TruncatableText(detail.summary, lineLimit: 2, isCopyable: true)
                                     .font(.body)
                                     .foregroundStyle(Color.textPrimary)
                                     .lineSpacing(4)

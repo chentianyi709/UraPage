@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 /// 可展开的正文：默认折叠到 `lineLimit` 行、末行内嵌「展开」，展开后显示全文并追加「收起」。
 ///
@@ -15,6 +16,12 @@ struct TruncatableText: View {
     let lineLimit: Int
 
     let animation: Animation
+
+    /// 是否提供长按复制全文的菜单。
+    ///
+    /// 点击已经用于展开／收起，复制只能排到次要手势上；短简介没有展开动作，
+    /// 长按复制同样可用。
+    let isCopyable: Bool
 
     /// 折叠上限的高度（`lineLimit` 行）。
     @State private var collapsedHeight: CGFloat = 0
@@ -32,10 +39,12 @@ struct TruncatableText: View {
     init(
         _ text: String,
         lineLimit: Int = 2,
+        isCopyable: Bool = false,
         animation: Animation = .smooth(duration: 0.22, extraBounce: 0),
     ) {
         self.text = Self.cleaned(text)
         self.lineLimit = max(lineLimit, 1)
+        self.isCopyable = isCopyable
         self.animation = animation
     }
 
@@ -72,12 +81,21 @@ struct TruncatableText: View {
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            // 不可展开时只拦点击，不用 `.disabled`：它会把整段文字变灰，
-            // 同一页里长短不一的简介就会一个深一个浅。
-            .allowsHitTesting(isTruncatable)
+            // 不可展开时点击由 `toggle` 里的 guard 兜住，不用 `.disabled`：
+            // 它会把整段文字变灰，同一页里长短不一的简介就会一个深一个浅。
+            .contextMenu {
+                if isCopyable {
+                    Button("复制", systemImage: "doc.on.doc") {
+                        copy()
+                    }
+                    // 菜单项默认跟随全局 tint（品牌红）；复制是中性的查看动作，用主文本色。
+                    .tint(Color.textPrimary)
+                }
+            }
             .accessibilityLabel(text)
-            // 动画中途 `progress` 是小数，按一半判断比 `== 1` 稳。
-            .accessibilityValue(progress > 0.5 ? "已展开" : "已收起")
+            // 动画中途 `progress` 是小数，按一半判断比 `== 1` 稳；
+            // 不可展开时是静态文本，别报一个点不动的「已收起」。
+            .accessibilityValue(isTruncatable ? (progress > 0.5 ? "已展开" : "已收起") : "")
             // 不可展开时点不动，别让读屏把它当按钮报出来。
             .accessibilityRemoveTraits(isTruncatable ? [] : .isButton)
             // 同一页面换了正文时整个回到初始态：收起、清掉上一条的测量值。
@@ -141,6 +159,12 @@ struct TruncatableText: View {
         withAnimation(animation) {
             progress = progress == 0 ? 1 : 0
         }
+    }
+
+    /// 点按已被展开／收起占用，复制放在长按菜单里；系统本身不给反馈，成功由 Toast 回执。
+    private func copy() {
+        UIPasteboard.general.string = text
+        ToastCenter.shared.show("已复制", type: .success)
     }
 
     /// 去掉空行与每行首尾空白，保留有内容行之间的换行。
