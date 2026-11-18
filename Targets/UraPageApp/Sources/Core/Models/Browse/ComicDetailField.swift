@@ -68,6 +68,19 @@ extension ComicDetailField {
         )
     }
 
+    /// 收藏数，紧凑数字。
+    ///
+    /// 图标用书签形状：收藏在这一行里就是一个带数字的书签，也不会和「点赞数」的心形混淆。
+    static func favoriteCount(_ count: Int) -> Self {
+        let text = count.formatted(.number.notation(.compactName))
+        return Self(
+            value: text,
+            systemImage: "bookmark",
+            accessibilityText: "收藏数 \(text)",
+            tip: "收藏数",
+        )
+    }
+
     /// 图片数量。
     static func pageCount(_ count: Int) -> Self {
         Self(

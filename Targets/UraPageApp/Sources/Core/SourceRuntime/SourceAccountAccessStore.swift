@@ -4,7 +4,8 @@ import Observation
 /// 来源账号访问事实的唯一 owner：保存／恢复本源凭证并发布访问状态。
 ///
 /// 只做「资料与凭证完整性 → 访问事实」这一件事：不解析凭证内容、不发登录请求、不决定错误文案、不承载页面状态；
-/// 凭证由 `SourceCredentialRecord` 按 `sourceID` 隔离存放，日志分类与订阅者由来源与门禁使用。
+/// 凭证由 `SourceCredentialRecord` 按 `sourceID` 隔离存放，日志分类由来源使用；
+/// 访问事实通过 Observation 的 `current` 供门禁读取，没有额外的订阅接口。
 /// 服务端拒绝认证（401）时由来源 Client 携带请求发起时的凭证代次调用
 /// `invalidateAuthentication(rejectedGeneration:)`：只有代次仍匹配才清除凭证并发布未登录；
 /// 删除失败时保留当前状态，避免「UI 未登录、请求却仍带凭证」。
@@ -21,9 +22,6 @@ final class SourceAccountAccessStore<Credential: Codable & Sendable>: SourceAcce
 
     /// 账号操作代次：恢复、登录或清理时递增，旧结果不覆盖新状态。
     @ObservationIgnored private var generation = 0
-
-    /// 订阅者；门禁走 Observation 观察 `current`，这里是给非 SwiftUI 消费者的同一份事实。
-    @ObservationIgnored private var observers: [UUID: AsyncStream<SourceAccessSnapshot>.Continuation] = [:]
 
     /// 凭证代次：每次写入或删除开始时递增，供 Client 拒绝旧 Session 的迟到 401。
     @ObservationIgnored private(set) var credentialGeneration = 0
@@ -84,24 +82,6 @@ final class SourceAccountAccessStore<Credential: Codable & Sendable>: SourceAcce
             _ = try await startRestoration()
         } catch {
             // 失败事实由恢复任务发布，保留显式重试入口。
-        }
-    }
-
-    /// 订阅访问事实变化；订阅即先收到当前快照。
-    ///
-    /// TODO: 首个非 SwiftUI 消费者（Reader／下载的账号变化处理）接入时使用；
-    /// 当前门禁直接观察 `current`，本方法暂无调用方。
-    func updates() -> AsyncStream<SourceAccessSnapshot> {
-        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-            continuation.yield(current)
-
-            let observerID = UUID()
-            observers[observerID] = continuation
-            continuation.onTermination = { [weak self] _ in
-                Task { @MainActor in
-                    self?.observers[observerID] = nil
-                }
-            }
         }
     }
 
@@ -254,17 +234,13 @@ final class SourceAccountAccessStore<Credential: Codable & Sendable>: SourceAcce
         return try await task.value
     }
 
-    /// 提交新事实并通知订阅者；旧代次或与当前相同的快照不重复提交。
+    /// 提交新事实；旧代次或与当前相同的快照不重复提交。
     private func commit(_ snapshot: SourceAccessSnapshot, generation: Int) {
         guard generation == self.generation, snapshot != current else {
             return
         }
 
         current = snapshot
-
-        for continuation in observers.values {
-            continuation.yield(snapshot)
-        }
     }
 }
 

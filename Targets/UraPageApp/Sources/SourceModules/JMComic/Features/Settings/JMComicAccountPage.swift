@@ -35,11 +35,10 @@ struct JMComicAccountPage: View {
         }
     }
 
-    /// 头像：无头像（或 locator 为空白）时显示同尺寸占位图标。
+    /// 头像：无头像时显示同尺寸占位图标（空白 locator 在 DTO 映射时已按无头像处理）。
     @ContentBuilder
     private func avatar(_ profile: JMComicAccountProfile) -> some View {
-        if let avatar = profile.avatar,
-           avatar.locator.contains(where: { !$0.isWhitespace }) {
+        if let avatar = profile.avatar {
             ComicImageView(reference: avatar, targetSize: CGSize(width: 104, height: 104))
                 .clipShape(.circle)
                 .overlay {

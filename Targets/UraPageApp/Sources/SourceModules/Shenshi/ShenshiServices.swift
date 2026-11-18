@@ -3,7 +3,7 @@ import Foundation
 /// 绅士来源模块的唯一公开入口，共享同一个稳定 Source Client。
 ///
 /// 已暴露浏览、详情、图片、章节、Host 与账号（登录/退出/资料）能力。
-/// TODO: 评论属于后续层。
+/// 评论为只读能力，写操作尚未接入。
 struct ShenshiServices: ComicSourceRuntime, SourceHostSettingsProviding, Sendable {
     let sourceID = ComicSourceID.shenshi
 
@@ -121,6 +121,16 @@ struct ShenshiServices: ComicSourceRuntime, SourceHostSettingsProviding, Sendabl
             category: "Shenshi.Tag",
         ) {
             try await client.tagComics(tag: tag, page: page)
+        }
+    }
+
+    /// 读取绅士作品评论页；回复随页面一起返回。
+    func comments(comicID: String) async throws -> ComicCommentPage {
+        try await SourceServiceOperation.run(
+            failureMessage: "评论加载失败，id=\(comicID)",
+            category: "Shenshi.Comments",
+        ) {
+            try await client.comments(comicID: comicID)
         }
     }
 

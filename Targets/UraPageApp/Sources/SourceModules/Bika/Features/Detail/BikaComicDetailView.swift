@@ -37,10 +37,9 @@ struct BikaComicDetailView: View {
             onSelectTag: { presentation, navigation, kind, name in
                 switch kind {
                 case .category:
-                    // 胶囊只提供展示名称；路由携带当前详情给出的分类值。
-                    guard let category = navigation?.categories.first(where: {
-                        $0.title.trimmingCharacters(in: .whitespacesAndNewlines) == name
-                    }) else { return }
+                    // 胶囊只提供展示名称；分类标题在映射时已去掉首尾空白，直接比较即可。
+                    guard let category = navigation?.categories.first(where: { $0.title == name })
+                    else { return }
 
                     shell.navigator.push(BikaRoute.categoryComics(category))
 
@@ -69,6 +68,14 @@ struct BikaComicDetailView: View {
                     .unliked(message: nil)
                 }
             },
+            comments: ComicCommentsProvider(
+                loadPage: { page in
+                    try await services.comments(comicID: identity.comicID, page: page)
+                },
+                loadReplies: { commentID, page in
+                    try await services.commentReplies(commentID: commentID, page: page)
+                },
+            ),
             onOpenReader: { input in
                 shell.navigator.push(BikaRoute.reader(input))
             },

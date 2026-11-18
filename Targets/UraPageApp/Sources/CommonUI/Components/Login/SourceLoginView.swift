@@ -310,9 +310,10 @@ struct SourceLoginView: View {
         case .authenticationRequired:
             "账号或密码错误，请重新输入"
 
-        case let .serverRejected(code):
-            // 禁漫等来源用 401 表示凭证被拒；其余业务码无法区分具体原因。
-            code == "401" ? "账号或密码错误，请重新输入" : "登录失败，请稍后重试"
+        // 来源自己判定的凭证问题都已转成 `authenticationRequired`；其余业务码无法区分具体原因，
+        // 公共层不猜来源的业务码含义。
+        case .serverRejected:
+            "登录失败，请稍后重试"
 
         case .networkUnavailable:
             "网络连接失败，请检查网络后重试"

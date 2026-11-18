@@ -263,24 +263,7 @@ extension DownloadManager {
         index: Int,
         jobID: UUID,
     ) async {
-        let didWrite: Bool
-        do {
-            didWrite = try await persistence().finishChapter(
-                identity,
-                jobID: jobID,
-                state: .failed,
-                now: Date(),
-            )
-        } catch {
-            AppLogger.error(
-                "下载章节失败状态写入失败，chapterID=\(identity.chapterID)，errorType=\(String(reflecting: type(of: error)))",
-                category: "App.Download",
-            )
-            return
-        }
-        guard didWrite else { return }
-
-        updateChapterStateAfterRun(comic: comic, index: index, state: .failed)
+        await finishChapter(identity, comic: comic, index: index, jobID: jobID, state: .failed)
     }
 
     private func updateChapterStateAfterRun(comic: ComicIdentity, index: Int, state: DownloadState) {

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 三来源详情页共用的底部操作顺序；按钮行为由来源页面接入。
 ///
-/// 未接入的动作保持 `nil`，点击时不产生业务副作用；点赞按钮由是否存在 `onLike` 决定。
+/// 没有接入的动作传 `nil`，对应按钮就不渲染——不留「点了没反应」的入口。
 struct ComicDetailBottomToolbar: ToolbarContent {
     let showsOnlineActions: Bool
     let isLiked: Bool
@@ -36,11 +36,13 @@ struct ComicDetailBottomToolbar: ToolbarContent {
             }
         }
 
-        if showsOnlineActions {
+        if showsOnlineActions, let onFavorite {
             ToolbarItem(placement: .bottomBar) {
                 toolbarButton(systemImage: "bookmark", accessibilityLabel: "收藏", action: onFavorite)
             }
+        }
 
+        if showsOnlineActions, let onDownload {
             ToolbarItem(placement: .bottomBar) {
                 toolbarButton(
                     systemImage: downloadIsActive ? "arrow.down.circle.fill" : "arrow.down.circle",
@@ -62,7 +64,7 @@ struct ComicDetailBottomToolbar: ToolbarContent {
             }
         }
 
-        if showsOnlineActions {
+        if showsOnlineActions, let onComments {
             ToolbarItem(placement: .bottomBar) {
                 toolbarButton(systemImage: "bubble.left", accessibilityLabel: "查看评论", action: onComments)
             }
@@ -104,16 +106,16 @@ struct ComicDetailBottomToolbar: ToolbarContent {
     }
 
     /// 公共底栏按钮；任务进行中的图标可通过 `isBlinking` 持续闪烁。
+    ///
+    /// 动作不是可选的：没接入的动作在调用方就不渲染按钮，避免出现点了没反应的图标。
     private func toolbarButton(
         systemImage: String,
         accessibilityLabel: String,
         foregroundColor: Color = .primary,
         isBlinking: Bool = false,
-        action: (() -> Void)?,
+        action: @escaping () -> Void,
     ) -> some View {
-        Button {
-            action?()
-        } label: {
+        Button(action: action) {
             Image(systemName: systemImage)
                 .font(.body.weight(.semibold))
                 .foregroundStyle(foregroundColor)

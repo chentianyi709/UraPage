@@ -34,10 +34,8 @@ struct ShenshiComicDetailView: View {
                     }
 
                 case .tag:
-                    // 公共层传入的是清理过空白的展示名；网页标签名可能带首尾空白，两侧都 trim 后再匹配。
-                    guard let tag = navigation?.comicTags.first(where: {
-                        $0.name.trimmingCharacters(in: .whitespacesAndNewlines) == name
-                    }) else { return }
+                    // 公共层传入的是清理过空白的展示名；解析时标签名已归一化，直接比较即可。
+                    guard let tag = navigation?.comicTags.first(where: { $0.name == name }) else { return }
 
                     shell.navigator.push(ShenshiRoute.tagComics(tag))
 
@@ -52,6 +50,11 @@ struct ShenshiComicDetailView: View {
                     successMessage: "已复制作品链接",
                 )
             },
+            comments: ComicCommentsProvider(
+                loadPage: { _ in
+                    try await services.comments(comicID: identity.comicID)
+                },
+            ),
             onOpenReader: { input in
                 shell.navigator.push(ShenshiRoute.reader(input))
             },

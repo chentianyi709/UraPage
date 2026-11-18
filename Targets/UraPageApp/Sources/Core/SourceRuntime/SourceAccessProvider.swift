@@ -12,7 +12,4 @@ protocol SourceAccessProvider: AnyObject {
 
     /// 恢复失败后的显式重试。
     func retryRestoration() async
-
-    /// 订阅访问事实变化；订阅时先给出当前快照，使用 `bufferingNewest(1)`。
-    func updates() -> AsyncStream<SourceAccessSnapshot>
 }
