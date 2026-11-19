@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 
 /// 历史网格的卡片值：漫画展示项 + 完整进度身份（在线／离线各自独立）。
-struct ReadingHistoryCard: Identifiable {
+struct ReadingHistoryCard: Identifiable, Equatable {
     let comic: ComicListItem
     let progressIdentity: ReadingProgressIdentity
 
@@ -36,6 +36,13 @@ final class ReadingHistoryViewModel {
     @ObservationIgnored private let sourceNames: [ComicSourceID: String]
     @ObservationIgnored private var nextCursor: ReadingHistoryCursor?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+
+    /// SwiftData 保存通知的订阅；放在模型里而不是视图 `.task`，
+    /// 避免切走书架 tab 时订阅被取消、错过后台写入。
+    @ObservationIgnored private var changeTask: Task<Void, Never>?
+
+    /// 合并短时间内的多次写入：连续翻页、批量删除只会触发一次刷新。
+    @ObservationIgnored private let refreshDebouncer = Debouncer()
     @ObservationIgnored private var moreTask: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var needsRefresh = false
@@ -48,6 +55,33 @@ final class ReadingHistoryViewModel {
     deinit {
         loadTask?.cancel()
         moreTask?.cancel()
+        changeTask?.cancel()
+    }
+
+    /// 开始观察历史记录的保存通知：任何写入（阅读进度、删除、清理）都会让列表自动重读。
+    ///
+    /// 写入方不需要发送任何信号——SwiftData 在 `save()` 时自己发。
+    func startObservingChanges() {
+        guard changeTask == nil else {
+            return
+        }
+
+        changeTask = Task { [weak self] in
+            for await _ in PersistentChangeSignal.changes(entityName: "StoredReadingHistory") {
+                guard let self else {
+                    return
+                }
+
+                scheduleRefresh()
+            }
+        }
+    }
+
+    /// 300 毫秒内的多次写入合并成一次刷新：阅读时每翻一页都会保存一次进度。
+    private func scheduleRefresh() {
+        refreshDebouncer.schedule { [weak self] in
+            self?.refresh()
+        }
     }
 
     func refresh() {
@@ -73,7 +107,10 @@ final class ReadingHistoryViewModel {
                 try Task.checkCancellation()
                 guard let self, self.generation == generation else { return }
 
-                items = page.items.map(makeCard)
+                let cards = page.items.map(makeCard)
+                if cards != items {
+                    items = cards
+                }
                 nextCursor = page.nextCursor
                 needsRefresh = false
                 loadState = .loaded

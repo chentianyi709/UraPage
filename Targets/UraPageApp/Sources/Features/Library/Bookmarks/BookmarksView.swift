@@ -38,21 +38,17 @@ struct BookmarksView: View {
             sections(model)
         }
         .task(id: isActive) {
-            // 分页容器里四个页面常驻：切到本分区时 `isActive` 变化触发重读，
-            // 首次激活同时创建模型；从二级页返回由下面的 `.onAppear` 补一次。
             guard isActive else { return }
 
             if model == nil {
                 model = BookmarksViewModel(store: store)
+                // 首次进入读一次；之后新增／删除由保存通知驱动刷新，切回或从二级页返回都不再查库。
+                model?.startObservingChanges()
+                model?.refresh()
+            } else if let current = model, case .failed = current.loadState {
+                // 上次失败，切回时再试一次，不必让用户手动点重试。
+                current.refresh()
             }
-            model?.refresh()
-        }
-        .onAppear {
-            // 首次出现由 `.task` 创建并加载；这里只处理从二级页返回时的新增收藏。
-            // 首次挂载时两边可能同时到达，加载在途就不再排一次全量读取。
-            guard isActive, let model, model.loadState != .loading else { return }
-
-            model.refresh()
         }
     }
 

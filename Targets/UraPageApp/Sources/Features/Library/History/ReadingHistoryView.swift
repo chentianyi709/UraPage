@@ -30,7 +30,6 @@ struct ReadingHistoryView: View {
             historyGrid(model)
         }
         .task(id: isActive) {
-            // 观看历史没有变更流：首次激活创建模型，每次回到该分区都重读（新记录与保留期清理都在这里生效）。
             guard isActive else { return }
 
             if model == nil {
@@ -43,8 +42,13 @@ struct ReadingHistoryView: View {
                         ($0.sourceID, $0.displayName)
                     }),
                 )
+                // 首次进入读一次；之后记录有写入时由保存通知驱动刷新，切回分区不再查库。
+                model?.startObservingChanges()
+                model?.refresh()
+            } else if let current = model, case .failed = current.loadState {
+                // 上次失败，切回时再试一次，不必让用户手动点重试。
+                current.refresh()
             }
-            model?.refresh()
         }
         .alert(
             "删除观看记录？",

@@ -11,7 +11,7 @@ enum BookmarksDisplayError: Equatable, Sendable {
 }
 
 /// 书架「书签」页的一组内容：同一来源的收藏（作者／分类／标签混排），组内保持最近收藏在前。
-struct BookmarksSection: Identifiable {
+struct BookmarksSection: Identifiable, Equatable {
     let sourceID: ComicSourceID
     let entries: [Bookmark]
 
@@ -34,6 +34,13 @@ final class BookmarksViewModel {
 
     @ObservationIgnored private var loadTask: Task<Void, Never>?
 
+    /// SwiftData 保存通知的订阅；放在模型里而不是视图 `.task`，
+    /// 避免切走书架 tab 时订阅被取消、错过后台写入。
+    @ObservationIgnored private var changeTask: Task<Void, Never>?
+
+    /// 合并短时间内的多次写入：连续翻页、批量删除只会触发一次刷新。
+    @ObservationIgnored private let refreshDebouncer = Debouncer()
+
     /// 写操作串行队列：上一次落盘失败触发的重读不会插到下一次写入之前。
     ///
     /// operation 里只能同步地发起 `refresh()`（它自己创建任务）；不要在 operation 内 `await` 刷新结果——
@@ -48,9 +55,36 @@ final class BookmarksViewModel {
 
     deinit {
         loadTask?.cancel()
+        changeTask?.cancel()
     }
 
     /// 读取全部收藏；已加载过（包括空结果）的刷新保持当前展示，避免切回该分区时闪骨架。
+    /// 开始观察书签的保存通知：新增、删除、清空都会让列表自动重读。
+    ///
+    /// 写入方不需要发送任何信号——SwiftData 在 `save()` 时自己发。
+    func startObservingChanges() {
+        guard changeTask == nil else {
+            return
+        }
+
+        changeTask = Task { [weak self] in
+            for await _ in PersistentChangeSignal.changes(entityName: "StoredBookmark") {
+                guard let self else {
+                    return
+                }
+
+                scheduleRefresh()
+            }
+        }
+    }
+
+    /// 300 毫秒内的多次写入合并成一次刷新：阅读时每翻一页都会保存一次进度。
+    private func scheduleRefresh() {
+        refreshDebouncer.schedule { [weak self] in
+            self?.refresh()
+        }
+    }
+
     func refresh() {
         loadTask?.cancel()
         generation &+= 1
@@ -72,7 +106,10 @@ final class BookmarksViewModel {
                 let entries = try await store.entries()
                 guard generation == self.generation else { return }
 
-                sections = Self.group(entries)
+                let groups = Self.group(entries)
+                if groups != sections {
+                    sections = groups
+                }
                 loadState = .loaded
             } catch {
                 guard generation == self.generation else { return }
