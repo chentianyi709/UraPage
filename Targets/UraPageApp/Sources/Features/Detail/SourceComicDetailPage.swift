@@ -292,8 +292,12 @@ struct SourceComicDetailPage<Navigation: Decodable & Sendable, Related: View>: V
             onChapters: model?.value?.showsChapterEntry == true
                 ? { isChaptersSheetPresented = true }
                 : nil,
-            onComments: commentsController.map { _ in
-                { isCommentsPresented = true }
+            onComments: commentsController.map { controller in
+                {
+                    // 详情已经知道没有评论时直接展示空列表，打开弹窗不必再请求一次。
+                    controller.applyCommentCount(model?.value?.commentCount)
+                    isCommentsPresented = true
+                }
             },
             downloadState: downloadController?.workState,
         )

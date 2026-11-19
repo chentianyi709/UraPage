@@ -6,7 +6,8 @@ struct JMComicDetail: ComicDetailContentProviding {
     let viewCount: Int
     let likeCount: Int
     let isLiked: Bool
-    let commentCount: Int
+    /// 详情接口给出的评论总数；缺失时为 `nil`，评论弹窗照常请求。
+    let commentCount: Int?
     let publishedDateText: String?
     let summary: String
     let tags: [String]

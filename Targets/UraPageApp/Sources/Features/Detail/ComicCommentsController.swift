@@ -110,6 +110,20 @@ final class ComicCommentsController {
         isLoadingMore || loadMoreErrorMessage != nil || page > 1
     }
 
+    /// 打开弹窗前注入详情给出的评论总数。
+    ///
+    /// 只有还没取过评论（`.idle`）时接收：已经加载过的不再被详情数据覆盖。
+    /// 为 0 时直接落到空列表，省掉一次注定返回空的请求；`nil` 或大于 0 都照常请求。
+    func applyCommentCount(_ count: Int?) {
+        guard loadState == .idle, let count, count == 0 else {
+            return
+        }
+
+        total = 0
+        comments = []
+        loadState = .loaded
+    }
+
     /// 弹窗展示时触发首屏加载；已有结果或请求在途时直接返回。
     ///
     /// 失败过的页面重新打开会再试一次：用户关掉再进来，多半已经换了网络或 Host，
@@ -121,6 +135,8 @@ final class ComicCommentsController {
         guard loadTask == nil else {
             return
         }
+
+        // 详情已明确为零条：`applyCommentCount` 已经把状态落到 `.loaded`，这里直接返回。
 
         switch loadState {
         case .idle, .failed:

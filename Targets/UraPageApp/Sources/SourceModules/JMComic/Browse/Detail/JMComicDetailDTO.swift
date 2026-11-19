@@ -36,9 +36,10 @@ struct JMComicDetailDTO: Decodable, ReerCodableDelegate {
     @DecodingDefault(false)
     let liked: Bool
 
-    @DecodingDefault(0)
+    /// 评论总数；缺失时为 `nil`，不按 0 处理——详情页用这个值判断「一定没有评论」，
+    /// 字段下线时若默认成 0，会让所有作品都被预判成空评论、连请求都不再发。
     @FlexibleType
-    let commentTotal: Int
+    let commentTotal: Int?
 
     /// 服务端返回的图片总数量；详情接口不保证返回，缺失时保持 `nil`（界面不显示该字段）。
     @FlexibleType

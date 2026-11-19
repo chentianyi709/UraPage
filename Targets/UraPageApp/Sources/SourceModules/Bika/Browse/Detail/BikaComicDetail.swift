@@ -14,6 +14,9 @@ struct BikaComicDetail: ComicDetailContentProviding, Sendable {
     let isLiked: Bool
     let isFinished: Bool
 
+    /// 详情接口给出的评论总数；缺失时为 `nil`，不预判。
+    let commentCount: Int?
+
     /// 服务端 `updated_at` 解析后的本地日期文本；无法解析时为 `nil`。
     let updatedDateText: String?
 

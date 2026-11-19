@@ -73,20 +73,14 @@ struct JMComicDetailView: View {
             sourceNavigationData: Data(),
             showsChaptersButton: sourceDetail.showsChaptersButton,
         )
-        let readerChapters = sourceDetail.readerChapters.enumerated().map {
-            DownloadChapterCandidate(
-                identity: $0.element.identity,
-                title: $0.element.title,
-                order: $0.offset,
-            )
-        }
-        let chapterPickerChapters = sourceDetail.chapters.enumerated().map {
-            DownloadChapterCandidate(
-                identity: $0.element.identity,
-                title: $0.element.title,
-                order: $0.offset,
-            )
-        }
+        let readerChapters = sourceDetail.readerChapters.downloadChapterCandidates(
+            identity: \.identity,
+            title: \.title,
+        )
+        let chapterPickerChapters = sourceDetail.chapters.downloadChapterCandidates(
+            identity: \.identity,
+            title: \.title,
+        )
         return ComicDetailPresentation(
             detail: snapshot,
             readerChapters: readerChapters,
@@ -94,6 +88,7 @@ struct JMComicDetailView: View {
             chapterPickerChapters: chapterPickerChapters,
             relatedComics: sourceDetail.relatedComics,
             isLiked: sourceDetail.isLiked,
+            commentCount: sourceDetail.commentCount,
         )
     }
 }
