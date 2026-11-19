@@ -10,6 +10,12 @@ enum ShenshiCommentHTMLParser {
         do {
             let document = try SwiftSoup.parse(html)
             guard let list = try document.select("#plList").first() else {
+                // 评论区被作者关闭时，页面只剩 `#center_box` 里的「該作品評論區已關閉」，
+                // 没有列表容器。这不是解析失败，按空评论处理，界面显示「还没有评论」。
+                if try isCommentClosed(in: document) {
+                    return ComicCommentPage(comments: [], total: 0, hasMore: false)
+                }
+
                 AppLogger.error("移动版 HTML 缺少评论列表容器", category: "Shenshi.Comments")
                 throw ComicSourceError.invalidResponse
             }
@@ -197,6 +203,20 @@ enum ShenshiCommentHTMLParser {
             purpose: .avatar,
             variant: nil,
         )
+    }
+
+    /// 评论区是否已被作者关闭。
+    ///
+    /// 关闭后评论页只剩一条提示，既没有 `#plList` 也没有任何评论节点；
+    /// 只认这条文案，其他「没有列表」的情况（页面结构变化、作品异常）仍然按解析失败报错，
+    /// 不把真正的错误吞成「没有评论」。
+    private static func isCommentClosed(in document: Document) throws -> Bool {
+        guard let box = try document.select("#center_box").first() else {
+            return false
+        }
+
+        let text = try box.text()
+        return text.contains("評論區已關閉") || text.contains("评论区已关闭")
     }
 
     /// 从评论标题中提取服务端声明的评论总数。
