@@ -81,7 +81,7 @@ extension DownloadManager {
 
         var requeuedChapters: [ChapterIdentity] = []
         do {
-            requeuedChapters = try await persistence().requeueDownloadingChapters(for: comic, now: Date())
+            requeuedChapters = try await persistence().requeueDownloadingChapters(for: comic)
             if let chapter = requeuedChapters.first {
                 AppLogger.debug(
                     "Host 切换重排下载中章节，comicID=\(comic.comicID)，chapterID=\(chapter.chapterID)，count=\(requeuedChapters.count)",
@@ -96,7 +96,7 @@ extension DownloadManager {
         }
 
         do {
-            try await persistence().requeueDownloadingCover(for: comic, now: Date())
+            try await persistence().requeueDownloadingCover(for: comic)
         } catch {
             AppLogger.error(
                 "Host 切换重排封面写入失败，source=\(comic.sourceID.rawValue)，errorType=\(String(reflecting: type(of: error)))",

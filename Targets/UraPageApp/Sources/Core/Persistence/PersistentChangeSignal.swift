@@ -1,18 +1,39 @@
 import Foundation
 import SwiftData
 
-/// 按实体名监听 SwiftData 的保存通知。
+/// 按实体名监听「这个实体的数据变了」。
 ///
-/// 通知由 `ModelContext.save()` 自动发出，写入方不需要显式发送任何信号；
-/// 页面收到后才决定要不要重读，避免切回分区时无脑查库。
-///
-/// 前提是写入走显式 `save()`（项目里的 persistence 层都是这样），
-/// 依赖 autosave 的写入不会丢信号，但会延迟到系统保存时才到。
+/// 两个来源：普通写入靠 `ModelContext.save()` 自动发出的 `didSave`；批量写
+/// （`ModelContext.delete(model:)`）不物化对象、**不会**发 `didSave`，由持久化层在提交后
+/// 显式调用 `postBatchChange(entityName:)` 补一次。两者对订阅方是同一个语义：该实体变了，去重读。
 enum PersistentChangeSignal {
+    /// 参与变更通知的实体名。
+    ///
+    /// 从类型名取而不是在各调用点写裸字符串：模型改名时编译器会跟着报错，不会留下
+    /// 「写方发了通知、读方监听的还是旧名字」这种只能靠 grep 发现的静默失效。
+    enum Entity {
+        static let readingProgress = String(describing: StoredReadingProgress.self)
+        static let bookmark = String(describing: StoredBookmark.self)
+    }
+
+    /// 批量写补发的通知名；与 `didSave` 分开，避免把「某个实体变了」广播成「全都变了」。
+    private static let batchChangeName = Notification.Name("UraPage.PersistentChangeSignal.batch")
+    private static let entityKey = "entityName"
+
+    /// 批量写提交后显式广播一次。这是项目里唯一由写方主动发信号的场合，
+    /// 因为框架在这种情况下不提供通知，而列表仍需跨页刷新。
+    static func postBatchChange(entityName: String) {
+        NotificationCenter.default.post(
+            name: batchChangeName,
+            object: nil,
+            userInfo: [entityKey: entityName],
+        )
+    }
+
     /// 指定实体被插入、更新或删除时产出一次。
     static func changes(entityName: String) -> AsyncStream<Void> {
         AsyncStream { continuation in
-            let task = Task {
+            let saveTask = Task {
                 for await note in NotificationCenter.default.notifications(named: ModelContext.didSave) {
                     guard touches(entityName, in: note) else {
                         continue
@@ -21,9 +42,19 @@ enum PersistentChangeSignal {
                     continuation.yield(())
                 }
             }
+            let batchTask = Task {
+                for await note in NotificationCenter.default.notifications(named: batchChangeName) {
+                    guard note.userInfo?[entityKey] as? String == entityName else {
+                        continue
+                    }
+
+                    continuation.yield(())
+                }
+            }
 
             continuation.onTermination = { _ in
-                task.cancel()
+                saveTask.cancel()
+                batchTask.cancel()
             }
         }
     }

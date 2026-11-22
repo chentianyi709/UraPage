@@ -47,7 +47,7 @@ extension DownloadManager {
 
         do {
             guard isCurrentCoverRun(comic, token: token),
-                  try await persistence().startCover(for: comic, now: Date())
+                  try await persistence().startCover(for: comic)
             else { return }
 
             await publishCoverChange(comic: comic, state: .downloading)
@@ -84,7 +84,6 @@ extension DownloadManager {
             let saved = try await persistence().saveCoverAsset(
                 expectedCover: transfer.cover,
                 for: comic,
-                now: Date(),
             )
             guard saved else {
                 await markCoverFailed(for: comic, expectedCover: transfer.cover, token: token)
@@ -118,7 +117,6 @@ extension DownloadManager {
             guard try await persistence().failCover(
                 for: comic,
                 expectedCover: expectedCover,
-                now: Date(),
             ) else { return }
         } catch {
             AppLogger.error(

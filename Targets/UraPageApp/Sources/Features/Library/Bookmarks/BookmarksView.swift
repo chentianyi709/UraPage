@@ -38,16 +38,25 @@ struct BookmarksView: View {
             sections(model)
         }
         .task(id: isActive) {
-            guard isActive else { return }
+            guard isActive else {
+                model?.setActive(false)
+                return
+            }
 
             if model == nil {
                 model = BookmarksViewModel(store: store)
-                // 首次进入读一次；之后新增／删除由保存通知驱动刷新，切回或从二级页返回都不再查库。
+                // 首次进入读一次；之后新增／删除由保存通知驱动刷新，
+                // 切回或从二级页返回只在「不可见期间有过写入」时补读一次。
                 model?.startObservingChanges()
+                model?.setActive(true)
                 model?.refresh()
             } else if let current = model, case .failed = current.loadState {
                 // 上次失败，切回时再试一次，不必让用户手动点重试。
+                current.setActive(true)
                 current.refresh()
+            } else {
+                // 可见期间的写入仍由保存通知驱动；不可见期间的只记了脏，这里补一次。
+                model?.setActive(true)
             }
         }
     }
@@ -159,7 +168,7 @@ private struct BookmarkCapsuleList: View {
             horizontalSpacing: 8,
             verticalSpacing: 8,
         ) {
-            ForEach(entries, id: \.identityKey) { bookmark in
+            ForEach(entries, id: \.identity) { bookmark in
                 let kind = kind(for: bookmark)
 
                 Button {

@@ -11,16 +11,16 @@ enum AppConfiguration {
 
     enum Persistence {
         /// 按在线／离线模式隔离进度的阅读记录数据库。
-        static let readingHistoryStore = AppIdentifierNamespace.make("v1.reading-history.store")
+        static let readingHistoryStore = AppIdentifierNamespace.make("v2.reading-progress.store")
 
         /// 搜索历史数据库（按来源隔离），与阅读记录分开。
-        static let searchHistoryStore = AppIdentifierNamespace.make("v1.search-history.store")
+        static let searchHistoryStore = AppIdentifierNamespace.make("v2.search-history.store")
 
         /// 下载章节记录与已下载作品的数据库。
-        static let downloadStore = AppIdentifierNamespace.make("v1.downloads.store")
+        static let downloadStore = AppIdentifierNamespace.make("v2.downloads.store")
 
         /// 书签收藏（标签／作者／分类）数据库，与搜索历史、阅读记录分开。
-        static let bookmarkStore = AppIdentifierNamespace.make("v1.bookmarks.store")
+        static let bookmarkStore = AppIdentifierNamespace.make("v2.bookmarks.store")
     }
 
     enum Downloads {

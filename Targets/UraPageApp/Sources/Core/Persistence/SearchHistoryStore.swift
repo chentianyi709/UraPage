@@ -9,20 +9,12 @@ actor SearchHistoryStore {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        try await persistence().record(
-            sourceID: sourceID,
-            query: trimmed,
-            limit: AppConfiguration.SearchHistory.maxEntriesPerSource,
-            now: Date(),
-        )
+        try await persistence().record(sourceID: sourceID, query: trimmed)
     }
 
     /// 某来源的历史关键词，最近在前。
     func queries(for sourceID: ComicSourceID) async throws -> [String] {
-        try await persistence().queries(
-            for: sourceID,
-            limit: AppConfiguration.SearchHistory.maxEntriesPerSource,
-        )
+        try await persistence().queries(for: sourceID)
     }
 
     /// 删除某来源的一条关键词历史。

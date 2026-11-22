@@ -20,7 +20,6 @@ extension DownloadManager {
             completedChapterCount: runtime.completedChapterCount,
             chapterCount: runtime.chapterCount,
             progress: progress(for: runtime),
-            updatedAt: Date(),
         )
     }
 

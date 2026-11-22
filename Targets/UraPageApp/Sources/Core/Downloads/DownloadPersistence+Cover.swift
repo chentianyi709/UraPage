@@ -5,7 +5,7 @@ import SwiftData
 
 extension DownloadPersistence {
     /// 读取一个排队中作品的封面传输输入；作品身份或封面引用不可读时返回 `nil`。
-    func pendingCoverTransfer(for work: StoredDownloadedComic) throws -> PendingCoverTransfer? {
+    func pendingCoverTransfer(for work: StoredDownloadWork) throws -> PendingCoverTransfer? {
         guard let identity = work.identity else { return nil }
 
         let cover = try JSONDecoder().decode(ComicImageSource.self, from: work.coverReferenceData)
@@ -18,10 +18,9 @@ extension DownloadPersistence {
     func saveCoverAsset(
         expectedCover: ComicImageSource,
         for comic: ComicIdentity,
-        now: Date,
     ) throws -> Bool {
         do {
-            guard let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)) else {
+            guard let work = try fetchWork(for: comic) else {
                 throw DownloadPersistenceError.missingComicRecord
             }
 
@@ -33,7 +32,6 @@ extension DownloadPersistence {
             }
 
             work.coverState = .completed
-            work.updatedAt = now
             markProjectionDirty(for: comic)
             try saveChanges()
             return true
@@ -45,13 +43,12 @@ extension DownloadPersistence {
 
     /// 标记封面资产处理开始；缓存查找、缓存复制和网络获取都属于下载阶段。
     @discardableResult
-    func startCover(for comic: ComicIdentity, now: Date) throws -> Bool {
-        guard let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)),
+    func startCover(for comic: ComicIdentity) throws -> Bool {
+        guard let work = try fetchWork(for: comic),
               work.coverState == .queued
         else { return false }
 
         work.coverState = .downloading
-        work.updatedAt = now
         markProjectionDirty(for: comic)
         try saveChanges()
         return true
@@ -60,13 +57,12 @@ extension DownloadPersistence {
     /// Host 切换后把仍在下载的封面退回排队；已完成、失败或暂停的封面保持原状。
     ///
     /// 旧封面任务先取消并等待结束，再调用本方法，避免旧 Host 结果与重开任务交错。
-    func requeueDownloadingCover(for comic: ComicIdentity, now: Date) throws {
-        guard let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)),
+    func requeueDownloadingCover(for comic: ComicIdentity) throws {
+        guard let work = try fetchWork(for: comic),
               work.coverState == .downloading
         else { return }
 
         work.coverState = .queued
-        work.updatedAt = now
         markProjectionDirty(for: comic)
         try saveChanges()
     }
@@ -75,15 +71,13 @@ extension DownloadPersistence {
     func failCover(
         for comic: ComicIdentity,
         expectedCover: ComicImageSource,
-        now: Date,
     ) throws -> Bool {
-        guard let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)),
+        guard let work = try fetchWork(for: comic),
               work.coverState == .downloading,
               try JSONDecoder().decode(ComicImageSource.self, from: work.coverReferenceData) == expectedCover
         else { return false }
 
         work.coverState = .failed
-        work.updatedAt = now
         markProjectionDirty(for: comic)
         try saveChanges()
         return true

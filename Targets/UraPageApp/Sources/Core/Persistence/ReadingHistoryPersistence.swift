@@ -7,13 +7,16 @@ actor ReadingHistoryPersistence {
     private static let pageSize = 30
     private var revision: UInt64 = 0
 
+    /// 逐行解码封面引用用的解码器：一页 30 行不必每行新建；只在 actor 内同步使用。
+    private let jsonDecoder = JSONDecoder()
+
     @concurrent
     static func makeDefault() async throws -> ReadingHistoryPersistence {
-        let schema = Schema([StoredReadingHistory.self])
+        let schema = Schema([StoredReadingProgress.self])
         return try ReadingHistoryPersistence(
             modelContainer: SwiftDataStoreContainer.make(
                 schema: schema,
-                name: "ReadingHistoryV1",
+                name: "ReadingProgressV2",
                 fileName: AppConfiguration.Persistence.readingHistoryStore,
             ),
         )
@@ -21,19 +24,25 @@ actor ReadingHistoryPersistence {
 
     /// 漫画快照与最新进度在一次 save 中提交；失败回滚，不清空已有记录。
     func record(_ update: ReadingProgressUpdate) throws {
-        let identityKey = StoredReadingHistory.key(for: update.identity)
+        let comic = update.comic.identity
+        let rawSourceID = comic.sourceID.rawValue
+        let rawComicID = comic.comicID
+        let rawMode = update.contentMode.rawValue
         let coverReferenceData = try JSONEncoder().encode(update.comic.cover)
         let now = Date()
 
         do {
-            var descriptor = FetchDescriptor<StoredReadingHistory>(
-                predicate: #Predicate { $0.identityKey == identityKey },
+            var descriptor = FetchDescriptor<StoredReadingProgress>(
+                predicate: #Predicate {
+                    $0.sourceID == rawSourceID
+                        && $0.comicID == rawComicID
+                        && $0.contentModeRawValue == rawMode
+                },
             )
             descriptor.fetchLimit = 1
             if let stored = try modelContext.fetch(descriptor).first {
                 stored.title = update.comic.title
                 stored.authors = update.comic.authors
-                stored.contentModeRawValue = update.contentMode.rawValue
                 stored.coverReferenceData = coverReferenceData
                 stored.chapterID = update.pageIdentity.chapter.chapterID
                 stored.pageID = update.pageIdentity.pageID
@@ -41,7 +50,7 @@ actor ReadingHistoryPersistence {
                 stored.chapterTitle = update.chapterTitle
                 stored.updatedAt = now
             } else {
-                modelContext.insert(StoredReadingHistory(
+                modelContext.insert(StoredReadingProgress(
                     update: update,
                     coverReferenceData: coverReferenceData,
                     updatedAt: now,
@@ -59,9 +68,15 @@ actor ReadingHistoryPersistence {
     ///
     /// 存储行缺少章节／页面身份时按没有进度处理，不把损坏记录当成可继续阅读的位置。
     func progress(for identity: ReadingProgressIdentity) throws -> ReadingProgress? {
-        let identityKey = StoredReadingHistory.key(for: identity)
-        var descriptor = FetchDescriptor<StoredReadingHistory>(
-            predicate: #Predicate { $0.identityKey == identityKey },
+        let rawSourceID = identity.comic.sourceID.rawValue
+        let rawComicID = identity.comic.comicID
+        let rawMode = identity.contentMode.rawValue
+        var descriptor = FetchDescriptor<StoredReadingProgress>(
+            predicate: #Predicate {
+                $0.sourceID == rawSourceID
+                    && $0.comicID == rawComicID
+                    && $0.contentModeRawValue == rawMode
+            },
         )
         descriptor.fetchLimit = 1
         guard let stored = try modelContext.fetch(descriptor).first,
@@ -89,19 +104,23 @@ actor ReadingHistoryPersistence {
         }
 
         let sortBy = [
-            SortDescriptor(\StoredReadingHistory.updatedAt, order: .reverse),
-            SortDescriptor(\StoredReadingHistory.identityKey, order: .reverse),
+            SortDescriptor(\StoredReadingProgress.updatedAt, order: .reverse),
+            SortDescriptor(\StoredReadingProgress.sourceID, order: .reverse),
+            SortDescriptor(\StoredReadingProgress.comicID, order: .reverse),
         ]
         let onlineMode = ComicContentMode.online.rawValue
-        var descriptor: FetchDescriptor<StoredReadingHistory>
+        var descriptor: FetchDescriptor<StoredReadingProgress>
         if let cursor {
             let updatedAt = cursor.updatedAt
-            let identityKey = cursor.identityKey
+            let sourceID = cursor.sourceID
+            let comicID = cursor.comicID
             descriptor = FetchDescriptor(
                 predicate: #Predicate { item in
                     item.contentModeRawValue == onlineMode
                         && (item.updatedAt < updatedAt
-                            || (item.updatedAt == updatedAt && item.identityKey < identityKey))
+                            || (item.updatedAt == updatedAt
+                                && (item.sourceID < sourceID
+                                    || (item.sourceID == sourceID && item.comicID < comicID))))
                 },
                 sortBy: sortBy,
             )
@@ -135,33 +154,37 @@ actor ReadingHistoryPersistence {
             ReadingHistoryCursor(
                 revision: revision,
                 updatedAt: $0.updatedAt,
-                identityKey: $0.identityKey,
+                sourceID: $0.sourceID,
+                comicID: $0.comicID,
             )
         } : nil
         return ReadingHistoryPage(items: items, nextCursor: nextCursor)
     }
 
-    /// 删除全部历史；删除成功同样推进 revision，让在途分页游标失效。
+    /// 删除全部历史；批量删除不发出 `didSave`，提交后显式广播一次让书架重读。
+    ///
+    /// 逐条删除 5000 行约 0.75 s（2026-11-21 探针），批删是两条语句。
+    /// 删除成功同样推进 revision，让在途分页游标失效。
     func deleteAll() throws {
-        let records = try modelContext.fetch(FetchDescriptor<StoredReadingHistory>())
-        guard !records.isEmpty else { return }
+        let count = try modelContext.fetchCount(FetchDescriptor<StoredReadingProgress>())
+        guard count > 0 else { return }
 
-        for record in records {
-            modelContext.delete(record)
-        }
+        try modelContext.delete(model: StoredReadingProgress.self)
         try modelContext.save()
         revision &+= 1
+        PersistentChangeSignal.postBatchChange(entityName: PersistentChangeSignal.Entity.readingProgress)
     }
 
     /// 删除一个作品的全部阅读记录（在线与离线进度一并删除）。
     ///
+    /// 只涉及 1–2 行，保留逐条删除：`didSave` 会照常发出，书架无需显式通知。
     /// 单项删除不推进 revision：删除只会让行消失、不改变其余行的排序位置，键集分页游标
     /// 仍然有效；保持 revision 不变，已加载窗口可以继续续载，删除后不会触发整页重置。
     func delete(comic: ComicIdentity) throws {
         let sourceID = comic.sourceID.rawValue
         let comicID = comic.comicID
         let records = try modelContext.fetch(
-            FetchDescriptor<StoredReadingHistory>(
+            FetchDescriptor<StoredReadingProgress>(
                 predicate: #Predicate { $0.sourceID == sourceID && $0.comicID == comicID },
             ),
         )
@@ -180,13 +203,13 @@ actor ReadingHistoryPersistence {
 
     /// 统计无法读取的历史记录行（与分页跳过规则共用 `makeItem` 判定）。
     func unreadableRecordCount() throws -> Int {
-        try modelContext.fetch(FetchDescriptor<StoredReadingHistory>())
+        try modelContext.fetch(FetchDescriptor<StoredReadingProgress>())
             .count { isUnreadable($0) }
     }
 
     /// 删除无法读取的历史记录行；删除成功推进 revision，让在途分页游标失效。
     func removeUnreadableRecords() throws -> Int {
-        let records = try modelContext.fetch(FetchDescriptor<StoredReadingHistory>())
+        let records = try modelContext.fetch(FetchDescriptor<StoredReadingProgress>())
             .filter { isUnreadable($0) }
         guard !records.isEmpty else { return 0 }
 
@@ -204,7 +227,7 @@ actor ReadingHistoryPersistence {
     }
 
     /// 行是否无法读取；用 `makeItem` 的实际判定，避免统计与分页跳过两套规则漂移。
-    private func isUnreadable(_ stored: StoredReadingHistory) -> Bool {
+    private func isUnreadable(_ stored: StoredReadingProgress) -> Bool {
         do {
             _ = try makeItem(stored)
             return false
@@ -215,7 +238,7 @@ actor ReadingHistoryPersistence {
 
     /// 删除更新时间早于截止点的历史；删除成功同样推进 revision，让在途分页游标失效。
     func prune(olderThan cutoff: Date) throws {
-        let descriptor = FetchDescriptor<StoredReadingHistory>(
+        let descriptor = FetchDescriptor<StoredReadingProgress>(
             predicate: #Predicate { $0.updatedAt < cutoff },
         )
         let expired = try modelContext.fetch(descriptor)
@@ -228,7 +251,7 @@ actor ReadingHistoryPersistence {
         revision &+= 1
     }
 
-    private func makeItem(_ stored: StoredReadingHistory) throws -> ReadingHistoryItem {
+    private func makeItem(_ stored: StoredReadingProgress) throws -> ReadingHistoryItem {
         guard let sourceID = ComicSourceID(rawValue: stored.sourceID),
               let contentMode = ComicContentMode(rawValue: stored.contentModeRawValue),
               !stored.comicID.isEmpty,
@@ -240,12 +263,7 @@ actor ReadingHistoryPersistence {
         }
 
         let comicIdentity = ComicIdentity(sourceID: sourceID, comicID: stored.comicID)
-        let identity = ReadingProgressIdentity(comic: comicIdentity, contentMode: contentMode)
-        guard stored.identityKey == StoredReadingHistory.key(for: identity) else {
-            throw ReadingHistoryError.invalidStoredRecord
-        }
-
-        let cover = try JSONDecoder().decode(ComicImageSource.self, from: stored.coverReferenceData)
+        let cover = try jsonDecoder.decode(ComicImageSource.self, from: stored.coverReferenceData)
         let comic = LibraryComicSnapshot(
             identity: comicIdentity,
             title: stored.title,

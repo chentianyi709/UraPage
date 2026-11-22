@@ -32,7 +32,7 @@ struct BookmarkButton: View {
         .accessibilityAddTraits(isFavorite == true ? .isSelected : [])
         .sensoryFeedback(.impact(weight: .light), trigger: feedbackCount)
         .disabled(isFavorite == nil)
-        .task(id: bookmark.identityKey) {
+        .task(id: bookmark.identity) {
             // 同一页面切换书签时先回到未知态，避免旧收藏态短暂套到新条目上。
             isFavorite = nil
 

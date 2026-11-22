@@ -13,25 +13,25 @@ extension DownloadPersistence {
         var changed = false
 
         let rows = try modelContext.fetch(
-            FetchDescriptor<StoredDownload>(
+            FetchDescriptor<StoredDownloadChapter>(
                 predicate: #Predicate { $0.stateRawValue == downloading },
             ),
         )
         for row in rows {
             row.state = .queued
             row.jobID = nil
-            markProjectionDirty(workKey: Self.workKey(of: row))
+            markProjectionDirty(Self.workKey(of: row))
             changed = true
         }
 
         let works = try modelContext.fetch(
-            FetchDescriptor<StoredDownloadedComic>(
+            FetchDescriptor<StoredDownloadWork>(
                 predicate: #Predicate { $0.coverStateRawValue == downloading },
             ),
         )
         for work in works {
             work.coverState = .queued
-            markProjectionDirty(workKey: work.identityKey)
+            markProjectionDirty(DownloadWorkKey(sourceID: work.sourceID, comicID: work.comicID))
             changed = true
         }
 
@@ -43,24 +43,23 @@ extension DownloadPersistence {
     /// 启动对账后仍需下载的章节身份；中断阶段已先回退为排队状态。
     func pendingChapters() throws -> [ChapterIdentity] {
         let queued = DownloadState.queued.rawValue
-        let descriptor = FetchDescriptor<StoredDownload>(
+        let descriptor = FetchDescriptor<StoredDownloadChapter>(
             predicate: #Predicate { $0.stateRawValue == queued },
         )
         return try modelContext.fetch(descriptor).compactMap(\.chapterIdentity)
     }
 
     /// 挂起作品时同时暂停未完成封面；即使章节都已完成，暂停意图也会留在作品资产记录中。
-    func pauseWork(for comic: ComicIdentity, now: Date) throws {
+    func pauseWork(for comic: ComicIdentity) throws {
         let rows = try fetchDownloads(for: comic)
         var changed = false
         for row in rows where row.state?.canPause == true {
             row.state = .paused
             row.jobID = nil
-            row.stateChangedAt = now
             changed = true
         }
 
-        if let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)),
+        if let work = try fetchWork(for: comic),
            work.coverState?.canPause == true {
             work.coverState = .paused
             changed = true
@@ -68,7 +67,6 @@ extension DownloadPersistence {
         guard changed else { return }
 
         markProjectionDirty(for: comic)
-        try touchWorks(keys: [StoredDownloadedComic.key(for: comic)], now: now)
         try saveChanges()
     }
 
@@ -76,38 +74,36 @@ extension DownloadPersistence {
     ///
     /// 与逐个 `pauseWork` 的语义一致（只暂停 `canPause` 的状态、没有变化不写库），
     /// 但避免活动作品多时每个作品各提交一次 SwiftData 事务。
-    func pauseWorks(for comics: [ComicIdentity], now: Date) throws {
-        var changedWorkKeys: Set<String> = []
+    func pauseWorks(for comics: [ComicIdentity]) throws {
+        var changedWorkKeys: Set<DownloadWorkKey> = []
         for comic in comics {
             var changed = false
             for row in try fetchDownloads(for: comic) where row.state?.canPause == true {
                 row.state = .paused
                 row.jobID = nil
-                row.stateChangedAt = now
                 changed = true
             }
-            if let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)),
+            if let work = try fetchWork(for: comic),
                work.coverState?.canPause == true {
                 work.coverState = .paused
                 changed = true
             }
             if changed {
-                changedWorkKeys.insert(StoredDownloadedComic.key(for: comic))
+                changedWorkKeys.insert(DownloadWorkKey(comic))
             }
         }
         guard !changedWorkKeys.isEmpty else { return }
 
         for key in changedWorkKeys {
-            markProjectionDirty(workKey: key)
+            markProjectionDirty(key)
         }
-        try touchWorks(keys: changedWorkKeys, now: now)
         try saveChanges()
     }
 
     /// 开始下载一个章节：仅在仍处于排队态时生效，并绑定 jobID。
     @discardableResult
-    func startChapter(_ identity: ChapterIdentity, jobID: UUID, now: Date) throws -> Bool {
-        guard let stored = try fetchDownload(key: StoredDownload.key(for: identity)),
+    func startChapter(_ identity: ChapterIdentity, jobID: UUID) throws -> Bool {
+        guard let stored = try fetchDownload(for: identity),
               stored.state == .queued
         else {
             return false
@@ -115,7 +111,6 @@ extension DownloadPersistence {
 
         stored.state = .downloading
         stored.jobID = jobID
-        stored.stateChangedAt = now
         markProjectionDirty(for: identity.comic)
         try saveChanges()
         return true
@@ -129,9 +124,8 @@ extension DownloadPersistence {
         _ identity: ChapterIdentity,
         jobID: UUID,
         state: DownloadState,
-        now: Date,
     ) throws -> Bool {
-        guard let stored = try fetchDownload(key: StoredDownload.key(for: identity)),
+        guard let stored = try fetchDownload(for: identity),
               stored.state == .downloading,
               stored.jobID == jobID
         else {
@@ -140,9 +134,7 @@ extension DownloadPersistence {
 
         stored.state = state
         stored.jobID = nil
-        stored.stateChangedAt = now
         markProjectionDirty(for: identity.comic)
-        try touchWorks(keys: [StoredDownloadedComic.key(for: identity.comic)], now: now)
         try saveChanges()
         return true
     }
@@ -153,37 +145,34 @@ extension DownloadPersistence {
     /// 也覆盖「启动状态已写入、运行时还没来得及记录下载中章节」的窗口。已完成／失败／暂停章节和
     /// 已写入磁盘的页都保留，新任务重新打开章节后按 manifest 只补缺失页。
     @discardableResult
-    func requeueDownloadingChapters(for comic: ComicIdentity, now: Date) throws -> [ChapterIdentity] {
+    func requeueDownloadingChapters(for comic: ComicIdentity) throws -> [ChapterIdentity] {
         var requeued: [ChapterIdentity] = []
         for stored in try fetchDownloads(for: comic) where stored.state == .downloading {
             guard let identity = stored.chapterIdentity else { continue }
 
             stored.state = .queued
             stored.jobID = nil
-            stored.stateChangedAt = now
             requeued.append(identity)
         }
         guard !requeued.isEmpty else { return [] }
 
         markProjectionDirty(for: comic)
-        try touchWorks(keys: [StoredDownloadedComic.key(for: comic)], now: now)
         try saveChanges()
         return requeued
     }
 
     /// 继续／重试一个作品：暂停章节与封面重新排队；`includeFailed` 为真时失败项也重排队。
-    func requeueWork(for comic: ComicIdentity, includeFailed: Bool, now: Date) throws {
+    func requeueWork(for comic: ComicIdentity, includeFailed: Bool) throws {
         let rows = try fetchDownloads(for: comic)
         var changed = false
         for row in rows {
             if row.state == .paused || (includeFailed && row.state == .failed) {
                 row.state = .queued
                 row.jobID = nil
-                row.stateChangedAt = now
                 changed = true
             }
         }
-        if let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)),
+        if let work = try fetchWork(for: comic),
            work.coverState == .paused || (includeFailed && work.coverState == .failed) {
             work.coverState = .queued
             changed = true
@@ -191,7 +180,6 @@ extension DownloadPersistence {
         guard changed else { return }
 
         markProjectionDirty(for: comic)
-        try touchWorks(keys: [StoredDownloadedComic.key(for: comic)], now: now)
         try saveChanges()
     }
 }

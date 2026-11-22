@@ -47,6 +47,13 @@ final class ReadingHistoryViewModel {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var needsRefresh = false
 
+    /// 页面是否可见；不可见时保存通知只记脏、不查库。
+    ///
+    /// 阅读器每翻一页都会保存一次进度，看不见的历史页没必要跟着重查；
+    /// 切回书架时由 `setActive(true)` 补一次，列表不会停在旧数据上。
+    @ObservationIgnored private var isActive = true
+    @ObservationIgnored private var hasPendingChange = false
+
     init(store: ReadingHistoryStore, sourceNames: [ComicSourceID: String]) {
         self.store = store
         self.sourceNames = sourceNames
@@ -58,16 +65,19 @@ final class ReadingHistoryViewModel {
         changeTask?.cancel()
     }
 
-    /// 开始观察历史记录的保存通知：任何写入（阅读进度、删除、清理）都会让列表自动重读。
+    /// 开始观察历史记录的变更：任何写入（阅读进度、删除、清理）都会让列表重读；
+    /// 页面不可见时只记脏，切回补读。
     ///
-    /// 写入方不需要发送任何信号——SwiftData 在 `save()` 时自己发。
+    /// 普通写入由 SwiftData 在 `save()` 时自动发通知；批量写不发，由写方补一次
+    /// （见 `PersistentChangeSignal.postBatchChange`）。
     func startObservingChanges() {
         guard changeTask == nil else {
             return
         }
 
         changeTask = Task { [weak self] in
-            for await _ in PersistentChangeSignal.changes(entityName: "StoredReadingHistory") {
+            for await _ in PersistentChangeSignal
+                .changes(entityName: PersistentChangeSignal.Entity.readingProgress) {
                 guard let self else {
                     return
                 }
@@ -77,10 +87,35 @@ final class ReadingHistoryViewModel {
         }
     }
 
+    /// 由视图在 `.task(id:)` 里同步可见性：切走暂停刷新，切回补一次。
+    ///
+    /// 首次进入时调用方还会显式 `refresh()`（见视图的任务块），这里只在「不可见期间有过写入」时补读。
+    func setActive(_ active: Bool) {
+        isActive = active
+        guard active, hasPendingChange else { return }
+
+        hasPendingChange = false
+        refresh()
+    }
+
     /// 300 毫秒内的多次写入合并成一次刷新：阅读时每翻一页都会保存一次进度。
     private func scheduleRefresh() {
+        guard isActive else {
+            hasPendingChange = true
+            refreshDebouncer.cancel()
+            return
+        }
+
         refreshDebouncer.schedule { [weak self] in
-            self?.refresh()
+            guard let self else { return }
+
+            // 排队期间切走了：不查库，切回时由 `setActive(true)` 补读。
+            guard isActive else {
+                hasPendingChange = true
+                return
+            }
+
+            refresh()
         }
     }
 

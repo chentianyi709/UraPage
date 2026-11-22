@@ -7,10 +7,14 @@ import SwiftData
 /// 不单独维护作品状态表，避免双写不一致。下载进度是运行时的单位计数（章节信息＋分页＋页图片），
 /// 由 manifest 在恢复时重建，不落库。
 @Model
-final class StoredDownload {
-    #Index<StoredDownload>([\.sourceID, \.stateChangedAt])
+final class StoredDownloadChapter {
+    // 一章一条记录：来源 + 作品 + 章节三者唯一。`#Unique` 自带唯一索引，
+    // 不再像旧模型那样拼一列长度前缀身份键。
+    #Unique<StoredDownloadChapter>([\.sourceID, \.comicID, \.chapterID])
 
-    @Attribute(.unique) var identityKey: String
+    // 详情页与调度按「来源 + 作品」取该作品全部章节并按目录序返回，索引与这条查询对齐。
+    #Index<StoredDownloadChapter>([\.sourceID, \.comicID, \.chapterOrderSnapshot])
+
     var sourceID: String
     var comicID: String
     var chapterID: String
@@ -20,19 +24,16 @@ final class StoredDownload {
     var chapterOrderSnapshot: Int
 
     var stateRawValue: String
-    var jobID: UUID?
 
-    var createdAt: Date
-    var stateChangedAt: Date
+    /// 当前占用该章节的运行时任务；只做提交时的栅栏比较，不参与查询。
+    var jobID: UUID?
 
     init(
         request: DownloadChapterRequest,
         state: DownloadState,
         jobID: UUID?,
-        now: Date,
     ) {
         let identity = request.identity
-        identityKey = Self.key(for: identity)
         sourceID = identity.comic.sourceID.rawValue
         comicID = identity.comic.comicID
         chapterID = identity.chapterID
@@ -40,8 +41,6 @@ final class StoredDownload {
         chapterOrderSnapshot = request.chapterOrderSnapshot
         stateRawValue = state.rawValue
         self.jobID = jobID
-        createdAt = now
-        stateChangedAt = now
     }
 
     /// 类型化的下载状态；无法识别的持久化值返回 `nil`（损坏记录），由读取方显式跳过。
@@ -60,13 +59,5 @@ final class StoredDownload {
             comic: ComicIdentity(sourceID: sourceID, comicID: comicID),
             chapterID: chapterID,
         )
-    }
-
-    /// 长度前缀让任意两个完整章节身份都不会拼接碰撞（与 `StoredReadingHistory.key` 同款）。
-    static func key(for identity: ChapterIdentity) -> String {
-        let source = identity.comic.sourceID.rawValue
-        let comic = identity.comic.comicID
-        let chapter = identity.chapterID
-        return "\(source.count):\(source)\(comic.count):\(comic)\(chapter.count):\(chapter)"
     }
 }

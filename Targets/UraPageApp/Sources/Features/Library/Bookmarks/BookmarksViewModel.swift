@@ -49,6 +49,13 @@ final class BookmarksViewModel {
 
     @ObservationIgnored private var generation = 0
 
+    /// 页面是否可见；不可见时保存通知只记脏、不查库。
+    ///
+    /// 书签写入来自用户操作，频率不高；这条规则主要保证与历史页一致的行为：
+    /// 切回来时能看到不可见期间的新增／删除，而不是靠一次无条件的重读。
+    @ObservationIgnored private var isActive = true
+    @ObservationIgnored private var hasPendingChange = false
+
     init(store: BookmarkStore) {
         self.store = store
     }
@@ -58,17 +65,18 @@ final class BookmarksViewModel {
         changeTask?.cancel()
     }
 
-    /// 读取全部收藏；已加载过（包括空结果）的刷新保持当前展示，避免切回该分区时闪骨架。
-    /// 开始观察书签的保存通知：新增、删除、清空都会让列表自动重读。
+    /// 开始观察书签的变更：新增、删除、清空都会让列表重读；页面不可见时只记脏，切回补读。
     ///
-    /// 写入方不需要发送任何信号——SwiftData 在 `save()` 时自己发。
+    /// 普通写入由 SwiftData 在 `save()` 时自动发通知；批量写不发，由写方补一次
+    /// （见 `PersistentChangeSignal.postBatchChange`）。
     func startObservingChanges() {
         guard changeTask == nil else {
             return
         }
 
         changeTask = Task { [weak self] in
-            for await _ in PersistentChangeSignal.changes(entityName: "StoredBookmark") {
+            for await _ in PersistentChangeSignal
+                .changes(entityName: PersistentChangeSignal.Entity.bookmark) {
                 guard let self else {
                     return
                 }
@@ -78,13 +86,39 @@ final class BookmarksViewModel {
         }
     }
 
-    /// 300 毫秒内的多次写入合并成一次刷新：阅读时每翻一页都会保存一次进度。
+    /// 由视图在 `.task(id:)` 里同步可见性：切走暂停刷新，切回补一次。
+    ///
+    /// 首次进入时调用方还会显式 `refresh()`（见视图的任务块），这里只在「不可见期间有过写入」时补读。
+    func setActive(_ active: Bool) {
+        isActive = active
+        guard active, hasPendingChange else { return }
+
+        hasPendingChange = false
+        refresh()
+    }
+
+    /// 300 毫秒内的多次写入合并成一次刷新：连续保存只重读一次。
     private func scheduleRefresh() {
+        guard isActive else {
+            hasPendingChange = true
+            refreshDebouncer.cancel()
+            return
+        }
+
         refreshDebouncer.schedule { [weak self] in
-            self?.refresh()
+            guard let self else { return }
+
+            // 排队期间切走了：不查库，切回时由 `setActive(true)` 补读。
+            guard isActive else {
+                hasPendingChange = true
+                return
+            }
+
+            refresh()
         }
     }
 
+    /// 读取全部收藏；已加载过（包括空结果）的刷新保持当前展示，避免切回该分区时闪骨架。
     func refresh() {
         loadTask?.cancel()
         generation &+= 1
@@ -135,7 +169,7 @@ final class BookmarksViewModel {
         withAnimation(.snappy) {
             sections = sections.compactMap { section in
                 // 按身份键过滤：payload 不参与身份，重收藏后两者可能不同。
-                let entries = section.entries.filter { $0.identityKey != bookmark.identityKey }
+                let entries = section.entries.filter { $0.identity != bookmark.identity }
                 return entries.isEmpty
                     ? nil
                     : BookmarksSection(sourceID: section.sourceID, entries: entries)
