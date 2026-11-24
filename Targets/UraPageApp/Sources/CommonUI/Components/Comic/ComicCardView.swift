@@ -159,7 +159,7 @@ private struct ComicCardContextMenuModifier<MenuItems: View>: ViewModifier {
     init(
         item: ComicListItem,
         containerSize: CGSize,
-        @ViewBuilder menuItems: @escaping () -> MenuItems,
+        @ContentBuilder menuItems: @escaping () -> MenuItems,
     ) {
         self.item = item
         self.containerSize = containerSize
@@ -183,7 +183,7 @@ extension View {
     func comicCardContextMenu(
         item: ComicListItem,
         containerSize: CGSize,
-        @ViewBuilder menuItems: @escaping () -> some View,
+        @ContentBuilder menuItems: @escaping () -> some View,
     ) -> some View {
         modifier(ComicCardContextMenuModifier(
             item: item,

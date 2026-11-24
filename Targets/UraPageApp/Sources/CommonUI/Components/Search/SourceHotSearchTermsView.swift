@@ -6,7 +6,7 @@ import SwiftUI
 /// 标题 + 胶囊走公共 `CapsuleSection`，骨架走公共 `CapsuleSectionSkeleton`，与书签页共用同一套版式；
 /// 引导区通常与「最近搜索」共用同一滚动流：空态给固定最小高度保持居中，失败态保留标题并紧凑显示重试。
 struct SourceHotSearchTermsView: View {
-    /// 分区标题文案（由来源给出，如哔咔「热门搜索」、禁漫「热门成人主题」）。
+    /// 分区标题文案（由来源给出，如哔咔「热门搜索」、禁漫「热门主题」）。
     let title: String
 
     let model: SourceValueLoadModel<[String]>

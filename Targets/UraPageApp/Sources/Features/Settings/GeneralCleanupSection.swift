@@ -197,7 +197,7 @@ private struct CleanupActionRow: View {
     }
 
     /// 右侧状态：文本按副标题样式，加载与失败只给图标并补无障碍说明。
-    @ViewBuilder
+    @ContentBuilder
     private func statusView(_ status: CleanupRowStatus) -> some View {
         switch status {
         case let .text(value):

@@ -4,26 +4,37 @@ import Foundation
 actor SearchHistoryStore {
     private var persistenceTask: Task<SearchHistoryPersistence, any Error>?
 
-    /// 记录一次搜索；空关键词忽略。
-    func record(sourceID: ComicSourceID, query: String) async throws {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-
-        try await persistence().record(sourceID: sourceID, query: trimmed)
+    /// 两个分区的权威快照：一次读取得到，避免两个分区来自不同时间点。
+    func snapshot(for sourceID: ComicSourceID) async throws -> SearchHistorySnapshot {
+        try await persistence().snapshot(for: sourceID)
     }
 
-    /// 某来源的历史关键词，最近在前。
-    func queries(for sourceID: ComicSourceID) async throws -> [String] {
-        try await persistence().queries(for: sourceID)
+    /// 记录一次搜索并返回更新后的快照；关键词的整理与空值判断由调用方（`SearchHistoryViewModel`）负责。
+    func record(sourceID: ComicSourceID, query: String) async throws -> SearchHistorySnapshot {
+        try await persistence().record(sourceID: sourceID, query: query)
     }
 
-    /// 删除某来源的一条关键词历史。
-    func remove(sourceID: ComicSourceID, query: String) async throws {
+    /// 收藏或取消收藏，并返回更新后的快照。
+    func setFavorited(
+        _ favorited: Bool,
+        sourceID: ComicSourceID,
+        query: String,
+    ) async throws -> SearchHistorySnapshot {
+        try await persistence().setFavorited(favorited, sourceID: sourceID, query: query)
+    }
+
+    /// 清空某来源的收藏（删除这些收藏词），并返回更新后的快照。
+    func clearFavorites(for sourceID: ComicSourceID) async throws -> SearchHistorySnapshot {
+        try await persistence().clearFavorites(sourceID: sourceID)
+    }
+
+    /// 删除某来源的一条关键词历史，并返回更新后的快照。
+    func remove(sourceID: ComicSourceID, query: String) async throws -> SearchHistorySnapshot {
         try await persistence().remove(sourceID: sourceID, query: query)
     }
 
-    /// 清空某来源的全部搜索历史。
-    func clear(sourceID: ComicSourceID) async throws {
+    /// 清除某来源的「最近搜索」；收藏的搜索词保留；返回更新后的快照。
+    func clear(sourceID: ComicSourceID) async throws -> SearchHistorySnapshot {
         try await persistence().clear(sourceID: sourceID)
     }
 

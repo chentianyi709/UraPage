@@ -14,7 +14,7 @@ enum AppConfiguration {
         static let readingHistoryStore = AppIdentifierNamespace.make("v2.reading-progress.store")
 
         /// 搜索历史数据库（按来源隔离），与阅读记录分开。
-        static let searchHistoryStore = AppIdentifierNamespace.make("v2.search-history.store")
+        static let searchHistoryStore = AppIdentifierNamespace.make("v3.search-history.store")
 
         /// 下载章节记录与已下载作品的数据库。
         static let downloadStore = AppIdentifierNamespace.make("v2.downloads.store")
@@ -40,7 +40,7 @@ enum AppConfiguration {
     }
 
     enum SearchHistory {
-        /// 每个来源最多保留的搜索历史条数。
+        /// 每个来源最多保留的未收藏搜索历史条数；收藏项不参与裁剪。
         static let maxEntriesPerSource = 100
     }
 

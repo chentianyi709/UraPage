@@ -112,7 +112,7 @@ struct ComicDetailMetadataSection: View {
     ///
     /// 气泡是自绘的（`tooltip(_:)`），不用系统 `popover`：后者在这个自定义布局里以整行为锚点、
     /// 内容宽度还会被压成一字一行。点击同一个字段收起，点另一个字段直接换位置。
-    @ViewBuilder
+    @ContentBuilder
     private func fieldEntry(_ field: ComicDetailField, index: Int) -> some View {
         if let tip = field.tip {
             Button {

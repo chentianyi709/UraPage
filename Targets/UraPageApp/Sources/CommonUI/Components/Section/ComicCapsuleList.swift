@@ -1,15 +1,15 @@
 import SwiftUI
-import UIKit
 
-/// 以胶囊样式展示一组可点击的短文本：详情页的标签组（分类、标签、角色……）、搜索页的热门搜索词与历史词共用。
+/// 以胶囊样式展示一组可点击的短文本：详情页的标签组（分类、标签、角色……）、搜索页的热门搜索词、历史词与收藏词共用。
 ///
 /// 统一胶囊外观（`.caption` 中等字重、圆角、流式换行排布），配色由 `Style` 区分：
-/// 标签组与热门搜索用品牌色，搜索历史用中性灰白底，避免历史词与热门词抢同一个视觉重点。
-/// 传入 `onRemove` 时长按胶囊弹出系统菜单：复制文本、删除该条；常驻的删除按钮会被误触，所以放在长按里。
-struct ComicCapsuleList: View {
+/// 标签组、热门搜索与收藏用品牌色，搜索历史用中性灰白底，避免历史词与热门词抢同一个视觉重点。
+/// 长按菜单由调用方用 `@ContentBuilder` 逐条书写（与 `.contextMenu` 一致），组件不预设任何菜单项；
+/// 不传菜单时胶囊保持普通按钮语义。
+struct ComicCapsuleList<MenuContent: View>: View {
     /// 胶囊配色。
     enum Style {
-        /// 品牌色文字 + 品牌色 10% 底（分类、标签、热门搜索）。
+        /// 品牌色文字 + 品牌色 10% 底（分类、标签、热门搜索、收藏）。
         case brand
 
         /// 主文本 + 灰白底（搜索历史）。
@@ -22,11 +22,23 @@ struct ComicCapsuleList: View {
     /// 胶囊配色，默认品牌色。
     var style: Style = .brand
 
-    /// 长按删除某一条目的入口；`nil` 时长按不弹菜单。
-    var onRemove: ((String) -> Void)?
-
     /// 点击某个胶囊。
     let onSelect: (String) -> Void
+
+    /// 某个胶囊的长按菜单内容；按词条生成，可含 `Button` 的分隔与 `role`。
+    @ContentBuilder let menu: (String) -> MenuContent
+
+    init(
+        values: [String],
+        style: Style = .brand,
+        onSelect: @escaping (String) -> Void,
+        @ContentBuilder menu: @escaping (String) -> MenuContent,
+    ) {
+        self.values = values
+        self.style = style
+        self.onSelect = onSelect
+        self.menu = menu
+    }
 
     var body: some View {
         WrappingFlowLayout(
@@ -43,7 +55,7 @@ struct ComicCapsuleList: View {
         }
     }
 
-    /// 单个胶囊；有删除入口时挂系统长按菜单。
+    /// 单个胶囊；调用方给了菜单时挂系统长按菜单。
     @ContentBuilder
     private func chip(_ value: String) -> some View {
         let capsule = Button {
@@ -57,23 +69,12 @@ struct ComicCapsuleList: View {
                 .background(backgroundColor, in: Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(value)
 
-        if let onRemove {
-            capsule.contextMenu {
-                Button("复制", systemImage: "doc.on.doc") {
-                    // 直接写系统剪贴板；成功由 Toast 回执（系统本身不给反馈）。
-                    UIPasteboard.general.string = value
-                    ToastCenter.shared.show("已复制", type: .success)
-                }
-                // 菜单项默认跟随全局 tint（品牌红）；复制是中性的查看动作，用主文本色。
-                .tint(Color.textPrimary)
-
-                Button("删除", systemImage: "trash", role: .destructive) {
-                    onRemove(value)
-                }
-            }
-        } else {
+        if MenuContent.self == EmptyView.self {
             capsule
+        } else {
+            capsule.contextMenu { menu(value) }
         }
     }
 
@@ -97,5 +98,12 @@ struct ComicCapsuleList: View {
     private var uniqueValues: [String] {
         var seenValues: Set<String> = []
         return values.filter { seenValues.insert($0).inserted }
+    }
+}
+
+extension ComicCapsuleList where MenuContent == EmptyView {
+    /// 没有长按菜单的胶囊列表（详情标签组、热门搜索）。
+    init(values: [String], style: Style = .brand, onSelect: @escaping (String) -> Void) {
+        self.init(values: values, style: style, onSelect: onSelect) { _ in EmptyView() }
     }
 }

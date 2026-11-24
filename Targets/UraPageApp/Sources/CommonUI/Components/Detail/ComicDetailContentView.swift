@@ -111,9 +111,9 @@ struct ComicDetailContentView<Related: View>: View {
 
                         ForEach(visibleTagGroups) { group in
                             ComicDetailSection(title: group.kind.title, systemImage: group.kind.systemImage) {
-                                ComicCapsuleList(values: group.values) { value in
+                                ComicCapsuleList(values: group.values, onSelect: { value in
                                     onSelectTag(group.kind, value)
-                                }
+                                })
                             }
                         }
 
