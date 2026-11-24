@@ -1,5 +1,15 @@
-import CryptoKit
 import Foundation
+
+/// 书签的稳定身份：来源 + 维度 + 展示名。
+///
+/// 用户能识别的身份就是这三个字段；payload 只用于跳转、不参与判断，
+/// 重复收藏同一条时覆盖成最新的 payload。用结构体而不是摘要字符串：
+/// 比较与哈希由编译器生成，不需要在初始化时算 SHA-256，也不存在「算法变了旧键对不上」的风险。
+struct BookmarkIdentity: Hashable, Sendable {
+    let sourceID: ComicSourceID
+    let kindID: String
+    let displayName: String
+}
 
 /// 一条书签：来源 + 维度 + 展示名 + 来源私有身份。
 ///
@@ -9,21 +19,16 @@ import Foundation
 struct Bookmark: Hashable, Sendable {
     let sourceID: ComicSourceID
 
-    /// 维度标识；发布后不可修改，书签身份键由它参与计算。
+    /// 维度标识；发布后不可修改，参与书签身份计算。
     let kindID: String
 
     let displayName: String
     let payload: Data
 
-    /// 稳定身份键（来源＋维度＋展示名）。
-    ///
-    /// 初始化时算一次：按钮与列表在每次渲染都会读它，没必要每次重算摘要。
-    /// 用户能识别的身份就是这三个字段，payload 只用于跳转、不参与判断；
-    /// 重复收藏同一条时覆盖成最新的 payload。实际数据中不会出现同名但来源私有类型不同的条目，
-    /// 因此不需要把类型或 ID 纳入身份键。
-    /// 算法必须保持稳定：已存书签的 key 与页面新建书签的 key 一旦不一致，
-    /// 会出现「已收藏却显示未收藏」、重复插入或删不掉旧行。
-    let identityKey: String
+    /// 稳定身份（来源＋维度＋展示名）；列表 id、去重与收藏态判断都用它。
+    var identity: BookmarkIdentity {
+        BookmarkIdentity(sourceID: sourceID, kindID: kindID, displayName: displayName)
+    }
 
     /// 用来源 typed 值创建条目。
     ///
@@ -42,11 +47,6 @@ struct Bookmark: Hashable, Sendable {
         self.kindID = kindID
         self.displayName = displayName
         self.payload = payload
-        identityKey = SourceDigest.hex(
-            SHA256.hash(
-                data: IdentityKeyEncoder.v1([sourceID.rawValue, kindID, displayName]),
-            ),
-        )
     }
 
     /// 把 payload 还原为来源 typed 值；失败说明收藏来自旧版本或已损坏。

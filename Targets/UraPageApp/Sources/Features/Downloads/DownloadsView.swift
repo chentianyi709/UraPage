@@ -30,15 +30,23 @@ struct DownloadsView: View {
             downloadGrid(model)
         }
         .task(id: isActive) {
-            // 只在首次激活时创建并加载；页面常驻后切回不重读。
-            // 下载期间的状态变化由 start() 订阅的变更流持续推送，不需要重新查库。
-            guard isActive, model == nil else { return }
+            guard isActive else {
+                model?.setActive(false)
+                return
+            }
 
-            let model = DownloadsViewModel(manager: manager)
-            self.model = model
-            exportModel = DownloadsExportModel(manager: manager)
-            model.start()
-            model.refresh()
+            // 只在首次激活时创建并加载；页面常驻后切回只在「不可见期间需要整窗重读」时补一次。
+            // 逐条进度由 start() 订阅的变更流原地替换，不需要重新查库。
+            if model == nil {
+                let model = DownloadsViewModel(manager: manager)
+                self.model = model
+                exportModel = DownloadsExportModel(manager: manager)
+                model.start()
+                model.setActive(true)
+                model.refresh()
+            } else {
+                model?.setActive(true)
+            }
         }
         .sheet(
             isPresented: Binding(
@@ -57,24 +65,15 @@ struct DownloadsView: View {
                 }
             }
         }
-        .alert(
-            "删除下载记录？",
-            isPresented: Binding(
-                get: { pendingDelete != nil },
-                set: {
-                    if !$0 {
-                        pendingDelete = nil
-                    }
+        .alert(item: $pendingDelete) { summary in
+            Alert(
+                title: Text("删除下载记录？"),
+                message: Text("将删除《\(summary.title)》的下载记录，并移除已下载的章节图片与封面文件，此操作不可恢复。"),
+                primaryButton: .destructive(Text("删除")) {
+                    deleteDownload(summary)
                 },
-            ),
-            presenting: pendingDelete,
-        ) { summary in
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
-                deleteDownload(summary)
-            }
-        } message: { summary in
-            Text("将删除《\(summary.title)》的下载记录，并移除已下载的章节图片与封面文件，此操作不可恢复。")
+                secondaryButton: .cancel(Text("取消")),
+            )
         }
     }
 

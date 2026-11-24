@@ -12,12 +12,12 @@ extension DownloadPersistence {
 
     /// 指定章节的记录（按完整身份查询）；记录缺失或损坏时返回 `nil`。
     func chapterRecord(for identity: ChapterIdentity) throws -> ChapterDownloadRecord? {
-        try fetchDownload(key: StoredDownload.key(for: identity)).flatMap(makeRecord)
+        try fetchDownload(for: identity).flatMap(makeRecord)
     }
 
     /// 持久化中的全部作品原始身份（含来源不可识别的记录），用于孤儿资产判定。
     func allAssetIdentities() throws -> [DownloadAssetIdentity] {
-        try modelContext.fetch(FetchDescriptor<StoredDownloadedComic>()).map {
+        try modelContext.fetch(FetchDescriptor<StoredDownloadWork>()).map {
             DownloadAssetIdentity(sourceID: $0.sourceID, comicID: $0.comicID)
         }
     }
@@ -30,7 +30,7 @@ extension DownloadPersistence {
         let chapters = try fetchDownloads(for: comic)
             .compactMap(makeRecord)
             .sorted { $0.order < $1.order }
-        guard let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)) else {
+        guard let work = try fetchWork(for: comic) else {
             return (nil, chapters)
         }
 
@@ -38,7 +38,7 @@ extension DownloadPersistence {
     }
 
     func workDisplay(for comic: ComicIdentity) throws -> DownloadWorkDisplay? {
-        guard let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)),
+        guard let work = try fetchWork(for: comic),
               let coverState = work.coverState
         else { return nil }
 
@@ -58,7 +58,7 @@ extension DownloadPersistence {
     /// 打开离线详情只信任这个持久化状态，不逐章读取 manifest 或复核文件完整性，避免检查拖慢详情加载；
     /// 部分章节／图片失败的作品聚合为 `failed`，不在此返回（由下载记录重试）。
     func offlineRecord(for comic: ComicIdentity) throws -> DownloadedComicDetailRecord? {
-        guard let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)),
+        guard let work = try fetchWork(for: comic),
               work.state == .completed
         else { return nil }
 
@@ -88,7 +88,7 @@ extension DownloadPersistence {
     func pendingCoverTransfers() throws -> [PendingCoverTransfer] {
         let queued = DownloadState.queued.rawValue
         let works = try modelContext.fetch(
-            FetchDescriptor<StoredDownloadedComic>(
+            FetchDescriptor<StoredDownloadWork>(
                 predicate: #Predicate { $0.coverStateRawValue == queued },
             ),
         )
@@ -112,7 +112,7 @@ extension DownloadPersistence {
 
     /// 读取一个排队中作品的封面传输输入，供作品进入下载队列时使用。
     func pendingCoverTransfer(for comic: ComicIdentity) throws -> PendingCoverTransfer? {
-        guard let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)),
+        guard let work = try fetchWork(for: comic),
               work.coverState == .queued
         else { return nil }
 
@@ -120,7 +120,7 @@ extension DownloadPersistence {
     }
 
     func summary(for comic: ComicIdentity) throws -> DownloadedComicSummary? {
-        guard let work = try fetchWork(key: StoredDownloadedComic.key(for: comic)) else {
+        guard let work = try fetchWork(for: comic) else {
             return nil
         }
 

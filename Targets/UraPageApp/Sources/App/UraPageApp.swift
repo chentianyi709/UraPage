@@ -33,6 +33,7 @@ struct UraPageApp: App {
             .environment(\.readerProgressRecorderStorage, dependencies.readerProgressRecorder)
             .environment(\.searchHistoryStoreStorage, dependencies.searchHistory)
             .environment(\.bookmarkStoreStorage, dependencies.bookmarks)
+            .environment(\.followingStoreStorage, dependencies.followings)
             .environment(\.sourceRuntimeCatalogStorage, dependencies.catalog)
             // 统一 App 主题色：系统控件（加载圈、系统 Tab 选中态等）也使用品牌色，与旧版一致。
             .tint(Color.brandPrimary)

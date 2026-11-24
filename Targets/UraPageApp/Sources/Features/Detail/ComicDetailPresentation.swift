@@ -10,6 +10,12 @@ struct ComicDetailPresentation: Sendable {
     let relatedComics: [ComicListItem]
     let isLiked: Bool
 
+    /// 详情接口／页面给出的评论总数；`nil` 表示来源没有提供或无法判断。
+    ///
+    /// 只用来在打开评论弹窗前判断「一定没有评论」，避免为 0 条评论白请求一次；
+    /// 为 `nil` 时照常请求，由评论页自己给出结果。
+    let commentCount: Int?
+
     init(
         detail: DownloadedComicDetailSnapshot,
         readerChapters: [DownloadChapterCandidate],
@@ -17,6 +23,7 @@ struct ComicDetailPresentation: Sendable {
         chapterPickerChapters: [DownloadChapterCandidate],
         relatedComics: [ComicListItem] = [],
         isLiked: Bool = false,
+        commentCount: Int? = nil,
     ) {
         self.detail = detail
         self.readerChapters = readerChapters
@@ -24,6 +31,7 @@ struct ComicDetailPresentation: Sendable {
         self.chapterPickerChapters = chapterPickerChapters
         self.relatedComics = relatedComics
         self.isLiked = isLiked
+        self.commentCount = commentCount
     }
 
     /// 离线详情只展示下载状态已完成的章节；Reader 按 manifest 读取其页面文件。
@@ -36,6 +44,7 @@ struct ComicDetailPresentation: Sendable {
         chapterPickerChapters = readerChapters
         relatedComics = []
         isLiked = false
+        commentCount = nil
     }
 
     /// 是否展示底部操作栏：在线始终展示；离线只在有可用的章节入口时保留（章节入口在右）。

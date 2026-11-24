@@ -31,7 +31,7 @@ enum ShenshiComicDetailHTMLParser {
                 category: category(in: detailScope),
                 pageCount: pageCount(from: subInfoLines),
                 favoriteCount: favoriteCount(from: subInfoLines),
-                commentCount: commentCount(in: document, comicID: comicID),
+                commentCount: commentCount(in: document),
                 summary: summary(in: document),
                 comicTags: tags(in: document),
                 cover: .remote(
@@ -134,53 +134,22 @@ enum ShenshiComicDetailHTMLParser {
         return nil
     }
 
-    /// 从当前漫画的评论分区标题或入口文案中读取评论总数；没有评论入口表示零评论。
-    private static func commentCount(in document: Document, comicID: String) throws -> Int? {
-        let commentLink = try document
-            .select("a[href*=\"comment-index-aid-\"]")
-            .first { link in
-                try commentComicID(from: link.attr("href")) == comicID
+    /// 从「評論 (17)」这样的分区标题读取评论总数。
+    ///
+    /// 0 条评论时标题只剩「評論」（括号和数字都没有），按 0 处理；
+    /// 页面完全没有评论分区时返回 `nil`——评论区关闭或页面结构变化都属于这种情况，
+    /// 详情页给不出数量，交给评论页自己判断，不能在这里当成零。
+    private static func commentCount(in document: Document) throws -> Int? {
+        for header in try document.select(".dv-section-hd") {
+            let text = try normalizedText(header.text())
+            guard text.hasPrefix("評論") || text.hasPrefix("评论") else {
+                continue
             }
-        guard let commentLink else {
-            return 0
+
+            return numericCount(in: text) ?? 0
         }
 
-        if let headerText = try commentSection(containing: commentLink)?
-            .select(".dv-section-hd")
-            .first()?
-            .text(),
-            let count = numericCount(in: headerText) {
-            return count
-        }
-
-        let linkText = try normalizedText(commentLink.text()).convertedToSimplifiedChinese()
-        if let count = numericCount(in: linkText) {
-            return count
-        }
-
-        // 入口存在但文案格式未知时保持 nil；只有网页明确“抢沙发”时才返回零。
-        return linkText.contains("抢沙发") ? 0 : nil
-    }
-
-    /// 从评论入口向上寻找对应的详情分区，不依赖内联样式或固定层级。
-    private static func commentSection(containing link: Element) -> Element? {
-        var element: Element? = link
-        while let current = element {
-            if current.hasClass("dv-section") {
-                return current
-            }
-            element = current.parent()
-        }
         return nil
-    }
-
-    /// 从绅士评论入口 URL 中提取数字漫画 ID。
-    private static func commentComicID(from href: String) -> String? {
-        guard let match = href.firstMatch(of: #/(?:^|/)comment-index-aid-([0-9]+)\.html(?:[?#].*)?$/#) else {
-            return nil
-        }
-
-        return String(match.1)
     }
 
     /// 从评论分区的短文案中提取非负整数。

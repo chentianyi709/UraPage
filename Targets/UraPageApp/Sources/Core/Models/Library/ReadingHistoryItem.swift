@@ -43,10 +43,14 @@ struct ReadingHistoryItem: Identifiable, Hashable, Sendable {
 }
 
 /// 阅读记录按更新时间倒序分页的稳定边界。
+///
+/// tiebreak 用「来源 + 作品」两个真实列，不再依赖持久化层拼出来的身份键；
+/// 与 `#Index([\.contentModeRawValue, \.updatedAt, \.sourceID, \.comicID])` 的列顺序一致。
 struct ReadingHistoryCursor: Equatable, Sendable {
     let revision: UInt64
     let updatedAt: Date
-    let identityKey: String
+    let sourceID: String
+    let comicID: String
 }
 
 struct ReadingHistoryPage: Sendable {

@@ -23,7 +23,7 @@ final class ReaderProgressRecorder {
         let identity: ReadingProgressIdentity
         var latest: ReadingProgressUpdate?
         var generation = 0
-        var debounceTask: Task<Void, Never>?
+        var debouncer: Debouncer?
     }
 
     private struct Write {
@@ -92,7 +92,6 @@ final class ReaderProgressRecorder {
               pageIndex >= 0
         else { return }
 
-        session.debounceTask?.cancel()
         session.generation &+= 1
         let generation = session.generation
         session.latest = ReadingProgressUpdate(
@@ -102,13 +101,11 @@ final class ReaderProgressRecorder {
             pageIndex: pageIndex,
             chapterTitle: chapterTitle,
         )
-        session.debounceTask = Task { @concurrent [weak self] in
-            do {
-                try await Task.sleep(for: .milliseconds(500))
-            } catch {
-                return
-            }
-            await self?.saveLatest(sessionID: sessionID, generation: generation)
+        let debouncer = session.debouncer ?? Debouncer()
+        session.debouncer = debouncer
+        // 500 毫秒内继续翻页就重置计时，只有停下后才写最近位置。
+        debouncer.schedule(after: .milliseconds(500)) { [weak self] in
+            self?.saveLatest(sessionID: sessionID, generation: generation)
         }
         sessions[sessionID] = session
     }
@@ -119,9 +116,9 @@ final class ReaderProgressRecorder {
               activeSessionByIdentity[session.identity] == id
         else { return }
 
-        session.debounceTask?.cancel()
+        session.debouncer?.cancel()
+        session.debouncer = nil
         session.generation &+= 1
-        session.debounceTask = nil
         sessions[id] = session
         if let update = session.latest {
             enqueue(update)
@@ -146,7 +143,7 @@ final class ReaderProgressRecorder {
     private func finish(_ id: UUID) {
         guard let session = sessions.removeValue(forKey: id) else { return }
 
-        session.debounceTask?.cancel()
+        session.debouncer?.cancel()
         let identity = session.identity
         if activeSessionByIdentity[identity] == id {
             activeSessionByIdentity.removeValue(forKey: identity)
@@ -162,7 +159,7 @@ final class ReaderProgressRecorder {
               activeSessionByIdentity[session.identity] == sessionID
         else { return }
 
-        session.debounceTask = nil
+        session.debouncer = nil
         sessions[sessionID] = session
         if let update = session.latest {
             enqueue(update)

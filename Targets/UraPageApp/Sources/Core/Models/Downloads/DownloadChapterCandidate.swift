@@ -10,3 +10,22 @@ struct DownloadChapterCandidate: Identifiable, Hashable, Sendable {
         identity
     }
 }
+
+extension Array {
+    /// 按数组顺序生成章节候选：`order` 取下标，保证与来源给的阅读顺序一致。
+    ///
+    /// 三个来源的章节类型各不相同，只有「身份 + 标题 + 顺序」这一步完全一样，
+    /// 放在这里省掉每处重复的 `enumerated().map`。
+    func downloadChapterCandidates(
+        identity: (Element) -> ChapterIdentity,
+        title: (Element) -> String,
+    ) -> [DownloadChapterCandidate] {
+        enumerated().map {
+            DownloadChapterCandidate(
+                identity: identity($0.element),
+                title: title($0.element),
+                order: $0.offset,
+            )
+        }
+    }
+}

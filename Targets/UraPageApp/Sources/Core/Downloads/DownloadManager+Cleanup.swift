@@ -43,7 +43,7 @@ extension DownloadManager {
 
         // 一次事务暂停全部作品；写库失败时先恢复调度，不取消任何任务。
         do {
-            try await persistence().pauseWorks(for: Array(resumeState.knownComics), now: Date())
+            try await persistence().pauseWorks(for: Array(resumeState.knownComics))
         } catch {
             AppLogger.error(
                 "清除下载前停止任务写入失败，errorType=\(String(reflecting: type(of: error)))",
@@ -218,7 +218,7 @@ extension DownloadManager {
         pausedWorks = state.originallyPaused
         for comic in state.knownComics where !state.originallyPaused.contains(comic) {
             do {
-                try await persistence().requeueWork(for: comic, includeFailed: false, now: Date())
+                try await persistence().requeueWork(for: comic, includeFailed: false)
             } catch {
                 AppLogger.error(
                     "清除下载失败后恢复排队写入失败，source=\(comic.sourceID.rawValue)，errorType=\(String(reflecting: type(of: error)))",

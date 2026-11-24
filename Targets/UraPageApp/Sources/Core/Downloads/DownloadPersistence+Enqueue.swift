@@ -11,18 +11,17 @@ extension DownloadPersistence {
         guard !requests.isEmpty else { return }
 
         do {
-            var touchedComicKeys: Set<String> = []
             let requestsByComic = Dictionary(grouping: requests, by: \.identity.comic)
             let encoder = JSONEncoder()
             for (comic, comicRequests) in requestsByComic {
-                let workKey = StoredDownloadedComic.key(for: comic)
+                let workKey = DownloadWorkKey(comic)
                 let snapshot = comicRequests[0].comicSnapshot
                 let coverReferenceData = try encoder.encode(snapshot.cover)
                 let detailExtrasData = try encoder.encode(DownloadedComicDetailExtras(snapshot: snapshot))
                 // 作品行的标签／分类列只服务检索谓词：只取这两个标准维度，其余维度只进 extras、不参与下载检索。
                 let tags = snapshot.tagGroups.first { $0.kind == .tag }?.values ?? []
                 let categories = snapshot.tagGroups.first { $0.kind == .category }?.values ?? []
-                let existingWork = try fetchWork(key: workKey)
+                let existingWork = try fetchWork(workKey)
 
                 if let work = existingWork {
                     let existingCover = try JSONDecoder().decode(
@@ -42,7 +41,7 @@ extension DownloadPersistence {
                     work.detailExtrasData = detailExtrasData
                 } else {
                     modelContext.insert(
-                        StoredDownloadedComic(
+                        StoredDownloadWork(
                             identity: comic,
                             title: snapshot.title,
                             authors: snapshot.authorNames,
@@ -61,23 +60,28 @@ extension DownloadPersistence {
                 }
 
                 // 一次取出该作品已有章节，避免逐请求各查一次。
-                var existingDownloads = try Dictionary(
-                    uniqueKeysWithValues: fetchDownloads(for: comic).map { ($0.identityKey, $0) },
+                var existingChapters = try Dictionary(
+                    uniqueKeysWithValues: fetchDownloads(for: comic).compactMap { row in
+                        row.chapterIdentity.map { ($0, row) }
+                    },
                 )
                 var didChangeTasks = existingWork == nil
                 for request in comicRequests {
                     let identity = request.identity
-                    if let existing = existingDownloads[StoredDownload.key(for: identity)] {
+                    if let existing = existingChapters[identity] {
                         if existing.state == .failed {
                             existing.state = .queued
                             existing.jobID = nil
-                            existing.stateChangedAt = now
                             didChangeTasks = true
                         }
                     } else {
-                        let inserted = StoredDownload(request: request, state: .queued, jobID: nil, now: now)
+                        let inserted = StoredDownloadChapter(
+                            request: request,
+                            state: .queued,
+                            jobID: nil,
+                        )
                         modelContext.insert(inserted)
-                        existingDownloads[inserted.identityKey] = inserted
+                        existingChapters[identity] = inserted
                         didChangeTasks = true
                     }
                 }
@@ -85,10 +89,8 @@ extension DownloadPersistence {
                 if let work = existingWork, didChangeTasks {
                     work.sortAt = now
                 }
-                touchedComicKeys.insert(workKey)
-                markProjectionDirty(workKey: workKey)
+                markProjectionDirty(workKey)
             }
-            try touchWorks(keys: touchedComicKeys, now: now)
             try saveChanges()
         } catch {
             pendingProjectionKeys.removeAll()

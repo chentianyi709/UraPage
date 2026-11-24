@@ -36,6 +36,13 @@ final class DownloadsViewModel {
     /// 是否已接收过第一条事件；首条对齐版本后重读一次，覆盖订阅建立与首读之间的结构变化。
     @ObservationIgnored private var hasAppliedRevision = false
 
+    /// 页面是否可见；不可见时「重读窗口」这类查询推迟到切回，逐条进度仍原地替换。
+    ///
+    /// 下载期间章节状态变化很密，看不见的列表没必要每次都重查已加载窗口；
+    /// 原地替换是 O(1)、不查库，保留下来可以让切回时少一次整窗读取。
+    @ObservationIgnored private var isActive = true
+    @ObservationIgnored private var hasPendingRefresh = false
+
     init(manager: DownloadManager) {
         self.manager = manager
     }
@@ -197,7 +204,7 @@ final class DownloadsViewModel {
         guard hasAppliedRevision else {
             hasAppliedRevision = true
             appliedRevision = change.revision
-            refresh()
+            requestRefresh()
             return
         }
 
@@ -205,15 +212,34 @@ final class DownloadsViewModel {
         appliedRevision = change.revision
 
         guard !hasGap else {
-            refresh()
+            requestRefresh()
             return
         }
 
         if let summary = change.progress {
             replace(summary)
         } else {
-            refresh()
+            requestRefresh()
         }
+    }
+
+    /// 由视图在 `.task(id:)` 里同步可见性：切走时推迟整窗重读，切回补一次。
+    func setActive(_ active: Bool) {
+        isActive = active
+        guard active, hasPendingRefresh else { return }
+
+        hasPendingRefresh = false
+        refresh()
+    }
+
+    /// 需要重读已加载窗口时先看页面在不在：不可见就记脏，切回再读。
+    private func requestRefresh() {
+        guard isActive else {
+            hasPendingRefresh = true
+            return
+        }
+
+        refresh()
     }
 
     private func replace(_ summary: DownloadedComicSummary) {
@@ -224,7 +250,7 @@ final class DownloadsViewModel {
         let wasCompleted = items[index].state == .completed
         let isCompleted = summary.state == .completed
         guard wasCompleted == isCompleted else {
-            refresh()
+            requestRefresh()
             return
         }
 

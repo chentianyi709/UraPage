@@ -145,7 +145,7 @@ extension DownloadManager {
     ) async -> Bool {
         let didStart: Bool
         do {
-            didStart = try await persistence().startChapter(identity, jobID: jobID, now: Date())
+            didStart = try await persistence().startChapter(identity, jobID: jobID)
         } catch {
             AppLogger.error(
                 "下载章节启动状态写入失败，chapterID=\(identity.chapterID)，errorType=\(String(reflecting: type(of: error)))",
@@ -237,7 +237,6 @@ extension DownloadManager {
                 identity,
                 jobID: jobID,
                 state: state,
-                now: Date(),
             )
         } catch {
             AppLogger.error(

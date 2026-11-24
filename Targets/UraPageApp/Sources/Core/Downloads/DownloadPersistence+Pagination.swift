@@ -18,21 +18,25 @@ extension DownloadPersistence {
     ) throws -> DownloadedComicPage {
         let pageSize = max(limit, 1)
         let sortBy = [
-            SortDescriptor(\StoredDownloadedComic.sortGroup, order: .forward),
-            SortDescriptor(\StoredDownloadedComic.sortAt, order: .reverse),
-            SortDescriptor(\StoredDownloadedComic.identityKey, order: .reverse),
+            SortDescriptor(\StoredDownloadWork.sortGroup, order: .forward),
+            SortDescriptor(\StoredDownloadWork.sortAt, order: .reverse),
+            SortDescriptor(\StoredDownloadWork.sourceID, order: .reverse),
+            SortDescriptor(\StoredDownloadWork.comicID, order: .reverse),
         ]
-        var descriptor: FetchDescriptor<StoredDownloadedComic>
+        var descriptor: FetchDescriptor<StoredDownloadWork>
         if let cursor {
             let sortGroup = cursor.sortGroup
             let sortAt = cursor.sortAt
-            let identityKey = cursor.identityKey
+            let sourceID = cursor.sourceID
+            let comicID = cursor.comicID
             descriptor = FetchDescriptor(
                 predicate: #Predicate { work in
                     work.sortGroup > sortGroup
                         || (work.sortGroup == sortGroup
                             && (work.sortAt < sortAt
-                                || (work.sortAt == sortAt && work.identityKey < identityKey)))
+                                || (work.sortAt == sortAt
+                                    && (work.sourceID < sourceID
+                                        || (work.sourceID == sourceID && work.comicID < comicID)))))
                 },
                 sortBy: sortBy,
             )
@@ -64,7 +68,8 @@ extension DownloadPersistence {
             DownloadedComicCursor(
                 sortGroup: $0.sortGroup,
                 sortAt: $0.sortAt,
-                identityKey: $0.identityKey,
+                sourceID: $0.sourceID,
+                comicID: $0.comicID,
             )
         } : nil
         return DownloadedComicPage(items: items, nextCursor: nextCursor)

@@ -63,6 +63,7 @@ func makeBikaComicDetail(
         likeCount: comic.totalLikes,
         isLiked: comic.isLiked,
         isFinished: comic.finished,
+        commentCount: comic.commentsCount,
         updatedDateText: makeBikaUpdatedDateText(comic.updatedAt),
         chapters: chapters,
     )

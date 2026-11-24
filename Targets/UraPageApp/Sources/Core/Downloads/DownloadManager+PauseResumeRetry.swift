@@ -12,7 +12,7 @@ extension DownloadManager {
         runControls[comic]?.stop()
 
         do {
-            try await persistence().pauseWork(for: comic, now: Date())
+            try await persistence().pauseWork(for: comic)
         } catch {
             AppLogger.error(
                 "下载暂停写入失败，source=\(comic.sourceID.rawValue)，errorType=\(String(reflecting: type(of: error)))",
@@ -46,7 +46,7 @@ extension DownloadManager {
 
         pausedWorks.remove(comic)
         do {
-            try await persistence().requeueWork(for: comic, includeFailed: false, now: Date())
+            try await persistence().requeueWork(for: comic, includeFailed: false)
         } catch {
             AppLogger.error(
                 "下载继续写入失败，source=\(comic.sourceID.rawValue)，errorType=\(String(reflecting: type(of: error)))",
@@ -64,7 +64,7 @@ extension DownloadManager {
 
         pausedWorks.remove(comic)
         do {
-            try await persistence().requeueWork(for: comic, includeFailed: true, now: Date())
+            try await persistence().requeueWork(for: comic, includeFailed: true)
         } catch {
             AppLogger.error(
                 "下载重试写入失败，source=\(comic.sourceID.rawValue)，errorType=\(String(reflecting: type(of: error)))",

@@ -42,19 +42,14 @@ struct JMComicSearchView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         if let model {
                             SourceHotSearchTermsView(
-                                title: "热门成人主题",
+                                title: "热门主题",
                                 model: model.recommendations,
                                 onSelect: model.selectRecommendation,
                             )
                         }
 
-                        if let history, !history.queries.isEmpty {
-                            SearchHistoryView(
-                                queries: history.queries,
-                                onSelect: runSearch,
-                                onRemove: { query in Task { await history.remove(query) } },
-                                onClear: { Task { await history.clear() } },
-                            )
+                        if let history, !history.isEmpty {
+                            SearchHistorySection(history: history, onSelect: runSearch)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

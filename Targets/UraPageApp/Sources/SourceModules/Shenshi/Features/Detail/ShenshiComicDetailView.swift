@@ -102,6 +102,7 @@ struct ShenshiComicDetailView: View {
             downloadCandidates: [chapter],
             chapterPickerChapters: [chapter],
             relatedComics: sourceDetail.relatedComics,
+            commentCount: sourceDetail.commentCount,
         )
     }
 }

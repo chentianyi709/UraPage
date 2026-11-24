@@ -53,13 +53,8 @@ struct BikaSearchView: View {
                             )
                         }
 
-                        if let history, !history.queries.isEmpty {
-                            SearchHistoryView(
-                                queries: history.queries,
-                                onSelect: runSearch,
-                                onRemove: { query in Task { await history.remove(query) } },
-                                onClear: { Task { await history.clear() } },
-                            )
+                        if let history, !history.isEmpty {
+                            SearchHistorySection(history: history, onSelect: runSearch)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

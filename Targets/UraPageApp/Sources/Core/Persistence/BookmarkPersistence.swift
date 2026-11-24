@@ -1,7 +1,10 @@
 import Foundation
 import SwiftData
 
-/// 在独立 SwiftData executor 上读写书签收藏；只向上层返回公共值。
+/// 在独立 SwiftData executor 上读写「分类／标签」书签；只向上层返回公共值。
+///
+/// 关注的作者不在这里：那是另一个库、另一套读写（见 `FollowingPersistence`）。
+/// 这里保存的 `kindID` 只会是分类、标签或来源自定义的检索维度，不处理作者。
 @ModelActor
 actor BookmarkPersistence {
     @concurrent
@@ -10,14 +13,15 @@ actor BookmarkPersistence {
         return try BookmarkPersistence(
             modelContainer: SwiftDataStoreContainer.make(
                 schema: schema,
-                name: "BookmarkV1",
+                name: "BookmarkV3",
                 fileName: AppConfiguration.Persistence.bookmarkStore,
             ),
         )
     }
 
-    /// 保存一条收藏；已收藏时刷新 payload 与收藏时间（书架按时间倒序，跳转用最新身份）。
-    func save(_ bookmark: Bookmark, now: Date) throws {
+    /// 保存一条书签；已收藏时刷新 payload 与收藏时间（书架按时间倒序，跳转用最新身份）。
+    func save(_ bookmark: Bookmark) throws {
+        let now = Date()
         if let stored = try record(for: bookmark) {
             stored.payload = bookmark.payload
             stored.savedAt = now
@@ -37,8 +41,9 @@ actor BookmarkPersistence {
             FetchDescriptor<StoredBookmark>(
                 sortBy: [
                     SortDescriptor(\.savedAt, order: .reverse),
-                    // 同一时刻收藏的两条按身份键定序，避免每次读取顺序抖动。
-                    SortDescriptor(\.identityKey, order: .reverse),
+                    // 同一时刻收藏的两条按「来源 + 展示名」定序，避免每次读取顺序抖动。
+                    SortDescriptor(\.sourceID, order: .reverse),
+                    SortDescriptor(\.displayName, order: .reverse),
                 ],
             ),
         )
@@ -59,7 +64,10 @@ actor BookmarkPersistence {
         try record(for: bookmark) != nil
     }
 
-    /// 取消收藏。
+    /// 取消收藏；没有这一行时是空操作。
+    ///
+    /// 单行删除走对象删除而不是批删：批删不发 `didSave`，书架「书签」页靠它保持跨页一致；
+    /// 一行数据也没有批删的收益。
     func remove(_ bookmark: Bookmark) throws {
         guard let stored = try record(for: bookmark) else {
             return
@@ -69,21 +77,23 @@ actor BookmarkPersistence {
         try modelContext.save()
     }
 
-    /// 删除某个来源的全部收藏（书架分组右侧的「清除」）。
-    func removeAll(sourceID: ComicSourceID) throws {
-        let rawSourceID = sourceID.rawValue
+    /// 删除某个维度（分类或标签）的全部收藏，跨来源。
+    func removeAll(kindID: String) throws {
         try modelContext.delete(
             model: StoredBookmark.self,
-            where: #Predicate { $0.sourceID == rawSourceID },
+            where: #Predicate { $0.kind == kindID },
         )
         try modelContext.save()
+        PersistentChangeSignal.postBatchChange(entityName: PersistentChangeSignal.Entity.bookmark)
     }
 
-    /// 按身份键查一行。
+    /// 按「来源 + 维度 + 展示名」查一行（`#Unique` 唯一索引）。
     private func record(for bookmark: Bookmark) throws -> StoredBookmark? {
-        let key = bookmark.identityKey
+        let raw = bookmark.sourceID.rawValue
+        let kind = bookmark.kindID
+        let name = bookmark.displayName
         var descriptor = FetchDescriptor<StoredBookmark>(
-            predicate: #Predicate { $0.identityKey == key },
+            predicate: #Predicate { $0.sourceID == raw && $0.kind == kind && $0.displayName == name },
         )
         descriptor.fetchLimit = 1
         return try modelContext.fetch(descriptor).first

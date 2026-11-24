@@ -35,6 +35,11 @@ struct BikaComicDetailDTO: Decodable, ReerCodableDelegate, Sendable {
     let totalViews: Int
     let isLiked: Bool
 
+    /// 作品评论总数；接口返回 `commentsCount`（驼峰）。缺失时按「未知」处理，
+    /// 不能当成 0——那会让有评论的作品被预判成「还没有评论」。
+    @FlexibleType
+    let commentsCount: Int?
+
     /// 作品最后更新时间；详情字段行的日期展示它。
     @CodingKey("updated_at")
     let updatedAt: String?

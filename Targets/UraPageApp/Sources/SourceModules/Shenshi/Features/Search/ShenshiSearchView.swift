@@ -27,13 +27,12 @@ struct ShenshiSearchView: View {
                 ToolbarItemGroup(placement: .topBarTrailing) {}
             },
             idle: {
-                if let history, !history.queries.isEmpty {
-                    SearchHistorySection(
-                        queries: history.queries,
-                        onSelect: runSearch,
-                        onRemove: { query in Task { await history.remove(query) } },
-                        onClear: { Task { await history.clear() } },
-                    )
+                if let history, !history.isEmpty {
+                    ScrollView {
+                        SearchHistorySection(history: history, onSelect: runSearch)
+                            .padding(16)
+                    }
+                    .scrollIndicators(.hidden)
                 } else {
                     EmptyStateView(
                         title: "搜索漫画",

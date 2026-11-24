@@ -30,8 +30,10 @@ struct ReadingHistoryView: View {
             historyGrid(model)
         }
         .task(id: isActive) {
-            // 观看历史没有变更流：首次激活创建模型，每次回到该分区都重读（新记录与保留期清理都在这里生效）。
-            guard isActive else { return }
+            guard isActive else {
+                model?.setActive(false)
+                return
+            }
 
             if model == nil {
                 imageServices = Dictionary(uniqueKeysWithValues: ComicSourceID.allCases.map {
@@ -43,27 +45,29 @@ struct ReadingHistoryView: View {
                         ($0.sourceID, $0.displayName)
                     }),
                 )
+                // 首次进入读一次；之后记录有写入时由保存通知驱动刷新，
+                // 切回分区只在「不可见期间有过写入」时补读一次。
+                model?.startObservingChanges()
+                model?.setActive(true)
+                model?.refresh()
+            } else if let current = model, case .failed = current.loadState {
+                // 上次失败，切回时再试一次，不必让用户手动点重试。
+                current.setActive(true)
+                current.refresh()
+            } else {
+                // 可见期间的写入仍由保存通知驱动；不可见期间的只记了脏，这里补一次。
+                model?.setActive(true)
             }
-            model?.refresh()
         }
-        .alert(
-            "删除观看记录？",
-            isPresented: Binding(
-                get: { pendingDelete != nil },
-                set: {
-                    if !$0 {
-                        pendingDelete = nil
-                    }
+        .alert(item: $pendingDelete) { card in
+            Alert(
+                title: Text("删除观看记录？"),
+                message: Text("将删除《\(card.comic.title)》的观看记录与继续阅读进度，此操作不可恢复。"),
+                primaryButton: .destructive(Text("删除")) {
+                    deleteHistory(card)
                 },
-            ),
-            presenting: pendingDelete,
-        ) { card in
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
-                deleteHistory(card)
-            }
-        } message: { card in
-            Text("将删除《\(card.comic.title)》的观看记录与继续阅读进度，此操作不可恢复。")
+                secondaryButton: .cancel(Text("取消")),
+            )
         }
     }
 

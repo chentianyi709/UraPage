@@ -64,7 +64,7 @@ extension DownloadManager {
         if hadActiveTransfers {
             // 与暂停一致：先把进行中／排队行落为「已暂停」（被取消的任务自身不写状态）。
             do {
-                try await persistence().pauseWork(for: comic, now: Date())
+                try await persistence().pauseWork(for: comic)
             } catch {
                 AppLogger.error(
                     "下载删除前停止任务写入失败，source=\(comic.sourceID.rawValue)，errorType=\(String(reflecting: type(of: error)))",
@@ -131,7 +131,7 @@ extension DownloadManager {
         if state.hadActiveTransfers {
             // 删除未生效：把取消过的任务放回调度，与「继续」同一路径。
             do {
-                try await persistence().requeueWork(for: comic, includeFailed: false, now: Date())
+                try await persistence().requeueWork(for: comic, includeFailed: false)
             } catch {
                 AppLogger.error(
                     "下载删除失败后恢复排队写入失败，source=\(comic.sourceID.rawValue)，errorType=\(String(reflecting: type(of: error)))",

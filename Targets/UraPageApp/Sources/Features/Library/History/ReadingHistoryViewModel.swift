@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 
 /// 历史网格的卡片值：漫画展示项 + 完整进度身份（在线／离线各自独立）。
-struct ReadingHistoryCard: Identifiable {
+struct ReadingHistoryCard: Identifiable, Equatable {
     let comic: ComicListItem
     let progressIdentity: ReadingProgressIdentity
 
@@ -36,9 +36,23 @@ final class ReadingHistoryViewModel {
     @ObservationIgnored private let sourceNames: [ComicSourceID: String]
     @ObservationIgnored private var nextCursor: ReadingHistoryCursor?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+
+    /// SwiftData 保存通知的订阅；放在模型里而不是视图 `.task`，
+    /// 避免切走书架 tab 时订阅被取消、错过后台写入。
+    @ObservationIgnored private var changeTask: Task<Void, Never>?
+
+    /// 合并短时间内的多次写入：连续翻页、批量删除只会触发一次刷新。
+    @ObservationIgnored private let refreshDebouncer = Debouncer()
     @ObservationIgnored private var moreTask: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var needsRefresh = false
+
+    /// 页面是否可见；不可见时保存通知只记脏、不查库。
+    ///
+    /// 阅读器每翻一页都会保存一次进度，看不见的历史页没必要跟着重查；
+    /// 切回书架时由 `setActive(true)` 补一次，列表不会停在旧数据上。
+    @ObservationIgnored private var isActive = true
+    @ObservationIgnored private var hasPendingChange = false
 
     init(store: ReadingHistoryStore, sourceNames: [ComicSourceID: String]) {
         self.store = store
@@ -48,6 +62,61 @@ final class ReadingHistoryViewModel {
     deinit {
         loadTask?.cancel()
         moreTask?.cancel()
+        changeTask?.cancel()
+    }
+
+    /// 开始观察历史记录的变更：任何写入（阅读进度、删除、清理）都会让列表重读；
+    /// 页面不可见时只记脏，切回补读。
+    ///
+    /// 普通写入由 SwiftData 在 `save()` 时自动发通知；批量写不发，由写方补一次
+    /// （见 `PersistentChangeSignal.postBatchChange`）。
+    func startObservingChanges() {
+        guard changeTask == nil else {
+            return
+        }
+
+        changeTask = Task { [weak self] in
+            for await _ in PersistentChangeSignal
+                .changes(entityName: PersistentChangeSignal.Entity.readingProgress) {
+                guard let self else {
+                    return
+                }
+
+                scheduleRefresh()
+            }
+        }
+    }
+
+    /// 由视图在 `.task(id:)` 里同步可见性：切走暂停刷新，切回补一次。
+    ///
+    /// 首次进入时调用方还会显式 `refresh()`（见视图的任务块），这里只在「不可见期间有过写入」时补读。
+    func setActive(_ active: Bool) {
+        isActive = active
+        guard active, hasPendingChange else { return }
+
+        hasPendingChange = false
+        refresh()
+    }
+
+    /// 300 毫秒内的多次写入合并成一次刷新：阅读时每翻一页都会保存一次进度。
+    private func scheduleRefresh() {
+        guard isActive else {
+            hasPendingChange = true
+            refreshDebouncer.cancel()
+            return
+        }
+
+        refreshDebouncer.schedule { [weak self] in
+            guard let self else { return }
+
+            // 排队期间切走了：不查库，切回时由 `setActive(true)` 补读。
+            guard isActive else {
+                hasPendingChange = true
+                return
+            }
+
+            refresh()
+        }
     }
 
     func refresh() {
@@ -73,7 +142,10 @@ final class ReadingHistoryViewModel {
                 try Task.checkCancellation()
                 guard let self, self.generation == generation else { return }
 
-                items = page.items.map(makeCard)
+                let cards = page.items.map(makeCard)
+                if cards != items {
+                    items = cards
+                }
                 nextCursor = page.nextCursor
                 needsRefresh = false
                 loadState = .loaded

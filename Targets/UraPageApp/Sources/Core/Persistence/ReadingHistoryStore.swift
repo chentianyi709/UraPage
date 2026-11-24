@@ -7,6 +7,10 @@ actor ReadingHistoryStore {
     /// 当前保留天数；`nil` 表示不限制。由通用设置 owner 在启动与修改时写入。
     private var retentionDays: Int? = ReadingHistoryRetention.defaultValue.dayCount
 
+    /// 上次真正扫库清理的时间。刷新现在跟着保存通知走，阅读时每次记录进度都会触发一次，
+    /// 按小时节流，避免每翻一页都扫库删过期记录。
+    private var lastPruneAt: Date?
+
     /// 由阅读历史设置 owner 推入当前保留档位。
     func setRetentionDays(_ days: Int?) {
         retentionDays = days
@@ -60,6 +64,11 @@ actor ReadingHistoryStore {
             return
         }
 
+        if let lastPruneAt, Date().timeIntervalSince(lastPruneAt) < 3600 {
+            return
+        }
+
+        lastPruneAt = Date()
         try await persistence().prune(olderThan: cutoff)
     }
 

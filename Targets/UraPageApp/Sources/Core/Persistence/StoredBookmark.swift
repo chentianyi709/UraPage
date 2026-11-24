@@ -5,11 +5,12 @@ import SwiftData
 ///
 /// 可展示、可排序的字段进列，来源私有身份以 payload 保存：公共层不需要认识来源结构，
 /// 与下载详情把非检索字段放 blob 的处理方式一致。
+/// 书签身份 = 来源 + 维度 + 展示名，交给 `#Unique` 约束，不再存一列摘要键。
 @Model
 final class StoredBookmark {
-    #Index<StoredBookmark>([\.savedAt])
+    // 同一来源、同一维度、同一展示名只允许一条；重收藏覆盖 payload（与旧摘要键语义一致）。
+    #Unique<StoredBookmark>([\.sourceID, \.kind, \.displayName])
 
-    @Attribute(.unique) var identityKey: String
     var sourceID: String
 
     /// 维度标识（`ComicTagKind.id`）；展示用的标题与图标由来源目录在读取时解析。
@@ -19,7 +20,6 @@ final class StoredBookmark {
     var savedAt: Date
 
     init(bookmark: Bookmark, savedAt: Date) {
-        identityKey = bookmark.identityKey
         sourceID = bookmark.sourceID.rawValue
         kind = bookmark.kindID
         displayName = bookmark.displayName

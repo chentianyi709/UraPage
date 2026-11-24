@@ -1,10 +1,8 @@
 import SwiftUI
 
-/// 标签／作者／分类列表页右上角的收藏按钮：读取当前收藏态并就地切换。
+/// 分类／标签列表页右上角的收藏按钮：读取当前收藏态并就地切换。
 ///
-/// 收藏态由书签 store 异步读取；点击直接切换并落盘，失败回滚并提示，
-/// 与搜索历史的乐观更新规则一致。按钮不固定 44×44 命中区：导航栏内容高度不足 44，
-/// 固定方框会被压成椭圆底；交给系统按图标包一圈玻璃，和返回按钮一样是正的圆。
+/// 收藏态与写入都走 `BookmarkStore`（书签库）；作者页用 `FollowingButton`，两者不共用存储。
 struct BookmarkButton: View {
     @Environment(\.bookmarkStore) private var store
 
@@ -14,83 +12,34 @@ struct BookmarkButton: View {
     /// 当前页面代表的那一条书签。
     let bookmark: Bookmark
 
-    @State private var isFavorite: Bool?
-
-    /// 触觉反馈计数：只在用户点击时自增，读取收藏态不会触发。
-    @State private var feedbackCount = 0
-
     var body: some View {
-        Button {
-            toggle()
-        } label: {
-            Image(systemName: isFavorite == true ? "bookmark.fill" : "bookmark")
-                .foregroundStyle(isFavorite == true ? Color.brandPrimary : Color.textPrimary)
-        }
-        .accessibilityLabel(
-            "\(isFavorite == true ? "取消收藏" : "收藏")，\(kindTitle)：\(bookmark.displayName)",
-        )
-        .accessibilityAddTraits(isFavorite == true ? .isSelected : [])
-        .sensoryFeedback(.impact(weight: .light), trigger: feedbackCount)
-        .disabled(isFavorite == nil)
-        .task(id: bookmark.identityKey) {
-            // 同一页面切换书签时先回到未知态，避免旧收藏态短暂套到新条目上。
-            isFavorite = nil
-
-            do {
-                let saved = try await store.isFavorite(bookmark)
-                guard !Task.isCancelled else { return }
-
-                isFavorite = saved
-            } catch {
-                guard !Task.isCancelled else { return }
-
-                AppLogger.warning(
-                    "书签收藏读取失败，source=\(bookmark.sourceID.rawValue) kind=\(bookmark.kindID) "
-                        + "errorType=\(type(of: error))",
-                    category: "Bookmarks",
-                )
-                isFavorite = false
-            }
-        }
-    }
-
-    /// 维度名称：来源目录里有就用目录的，没有（来源已移除该维度）就退回标识本身。
-    private var kindTitle: String {
-        descriptor.tagKind(id: bookmark.kindID)?.title ?? ComicTagKind.unknown(bookmark.kindID).title
-    }
-
-    /// 点击即切换本地展示并落盘；失败回滚。
-    ///
-    /// 收藏态只在这里读取一次（`.task`），点击不再二次查询 store：
-    /// 未读完前按钮禁用，读完后「看到什么就切换成相反」，不会出现点了取消却又收藏。
-    private func toggle() {
-        guard let current = isFavorite else { return }
-
-        // 点击即给触觉反馈，不等落盘；读取收藏态的那点延迟不该让手感变钝。
-        feedbackCount &+= 1
-
-        let target = !current
-        isFavorite = target
-
-        Task {
-            do {
+        MarkButton(
+            identity: "\(bookmark.sourceID.rawValue)|\(bookmark.kindID)|\(bookmark.displayName)",
+            labels: MarkButton.Labels(
+                subject: "\(kindTitle)：\(bookmark.displayName)",
+                onTitle: "收藏",
+                offTitle: "取消收藏",
+                failureMessage: { target in
+                    target ? "收藏失败，请稍后重试" : "取消收藏失败，请稍后重试"
+                },
+                logCategory: "Bookmarks",
+            ),
+            read: {
+                try await store.isFavorite(bookmark)
+            },
+            write: { target in
                 if target {
                     try await store.save(bookmark)
                 } else {
                     try await store.remove(bookmark)
                 }
-            } catch {
-                isFavorite = current
-                AppLogger.warning(
-                    "书签收藏写入失败，errorType=\(type(of: error))",
-                    category: "Bookmarks",
-                )
-                ToastCenter.shared.show(
-                    target ? "收藏失败，请稍后重试" : "取消收藏失败，请稍后重试",
-                    type: .error,
-                )
-            }
-        }
+            },
+        )
+    }
+
+    /// 维度名称：来源目录里有就用目录的，没有（来源已移除该维度）就退回标识本身。
+    private var kindTitle: String {
+        descriptor.tagKind(id: bookmark.kindID)?.title ?? ComicTagKind.unknown(bookmark.kindID).title
     }
 }
 

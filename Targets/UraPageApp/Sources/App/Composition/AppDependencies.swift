@@ -58,8 +58,11 @@ final class AppDependencies {
     /// 搜索历史入口（按来源隔离，独立 SwiftData 库）。
     let searchHistory = SearchHistoryStore()
 
-    /// 书签收藏入口（标签／作者／分类，跨来源，独立 SwiftData 库）。
+    /// 书签收藏入口（分类／标签，跨来源，独立 SwiftData 库）。
     let bookmarks = BookmarkStore()
+
+    /// 关注作者入口（跨来源，独立 SwiftData 库；与书签互不影响）。
+    let followings = FollowingStore()
 
     init() {
         // 具体来源的创建只在各来源 Module 维护，新增来源不再修改组合根的参数清单。
