@@ -26,7 +26,7 @@ struct ComicDetailMenuAction {
 /// 顶部工具栏右侧固定展示当前作品来源的圆形 Logo（在线／离线详情共用）；
 /// 来源信息读 `\.sourceDescriptor`，由来源 Module 的 destination 边界安装。
 /// 传入非空 `menuActions` 时，Logo 右侧再放一个「更多」按钮（`Menu` + `ellipsis.circle`），
-/// 两者中间插 `ToolbarSpacer(.fixed)` 分开排布（与来源首页的 Logo＋账号同款）；
+/// 两个入口相邻排布，系统会把它们并成一颗玻璃胶囊、连在一起；
 /// 空数组时只有 Logo，不放置点了没反应的入口。
 struct ComicDetailChrome<Content: View>: View {
     @Environment(\.sourceDescriptor) private var descriptor
@@ -55,10 +55,8 @@ struct ComicDetailChrome<Content: View>: View {
                 SourceLogoView(descriptor.logo, size: 36, outline: .circle)
             }
 
-            // 与来源首页一致：中间插固定 spacer，两项各拿一颗玻璃圆，不并成一颗胶囊。
+            // 两个入口相邻排布：iOS 26 会把相邻工具栏项并成一颗玻璃胶囊，Logo 与「更多」连在一起。
             if !menuActions.isEmpty {
-                ToolbarSpacer(.fixed, placement: .topBarTrailing)
-
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         ForEach(sections.indices, id: \.self) { sectionIndex in
