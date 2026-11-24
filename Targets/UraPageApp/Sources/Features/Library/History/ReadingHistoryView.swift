@@ -59,24 +59,15 @@ struct ReadingHistoryView: View {
                 model?.setActive(true)
             }
         }
-        .alert(
-            "删除观看记录？",
-            isPresented: Binding(
-                get: { pendingDelete != nil },
-                set: {
-                    if !$0 {
-                        pendingDelete = nil
-                    }
+        .alert(item: $pendingDelete) { card in
+            Alert(
+                title: Text("删除观看记录？"),
+                message: Text("将删除《\(card.comic.title)》的观看记录与继续阅读进度，此操作不可恢复。"),
+                primaryButton: .destructive(Text("删除")) {
+                    deleteHistory(card)
                 },
-            ),
-            presenting: pendingDelete,
-        ) { card in
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
-                deleteHistory(card)
-            }
-        } message: { card in
-            Text("将删除《\(card.comic.title)》的观看记录与继续阅读进度，此操作不可恢复。")
+                secondaryButton: .cancel(Text("取消")),
+            )
         }
     }
 

@@ -10,85 +10,92 @@ enum BookmarksDisplayError: Equatable, Sendable {
     }
 }
 
-/// 书架「书签」页的一组内容：同一来源的收藏（作者／分类／标签混排），组内保持最近收藏在前。
-struct BookmarksSection: Identifiable, Equatable {
-    let sourceID: ComicSourceID
+/// 书架「书签」页的一段：一个维度（分类／标签／未登记维度）下的全部收藏，跨来源。
+struct BookmarkGroup: Identifiable, Equatable {
+    let kindID: String
     let entries: [Bookmark]
 
     var id: String {
-        sourceID.rawValue
+        kindID
     }
 }
 
-/// 书架「书签」页的状态：一次读取全部收藏并按来源分组，删除时本地先动、失败再重读。
+/// 书架「书签」页的状态：一次读取关注与全部书签，按维度分段。
 ///
-/// 不分页：书签量级有限，一次 `fetch` 之后交给 `LazyVStack` 只构建可见的胶囊，
-/// 首屏与滚动都不需要额外的窗口管理；分页要处理游标失效、跨页写入与续载失败，收益不抵复杂度。
+/// 关注与书签分表读取，页面上「关注」固定在最前；其余按维度分段（分类 → 标签 → 未登记维度），
+/// 段内保持「最近收藏在前」，同来源的条目由页面按来源顺序排在一起。
+/// 不分页：量级有限，一次读取交给 `LazyVStack` 只构建可见胶囊。
 @Observable
 @MainActor
 final class BookmarksViewModel {
-    private(set) var sections: [BookmarksSection] = []
+    private(set) var followings: [Following] = []
+    private(set) var groups: [BookmarkGroup] = []
     private(set) var loadState: InitialLoadState<BookmarksDisplayError> = .idle
 
-    @ObservationIgnored private let store: BookmarkStore
+    @ObservationIgnored private let bookmarkStore: BookmarkStore
+
+    @ObservationIgnored private let followingStore: FollowingStore
 
     @ObservationIgnored private var loadTask: Task<Void, Never>?
 
-    /// SwiftData 保存通知的订阅；放在模型里而不是视图 `.task`，
+    /// 变更通知的订阅（书签与关注各一条）；放在模型里而不是视图 `.task`，
     /// 避免切走书架 tab 时订阅被取消、错过后台写入。
-    @ObservationIgnored private var changeTask: Task<Void, Never>?
+    @ObservationIgnored private var changeTasks: [Task<Void, Never>] = []
 
     /// 合并短时间内的多次写入：连续翻页、批量删除只会触发一次刷新。
     @ObservationIgnored private let refreshDebouncer = Debouncer()
 
     /// 写操作串行队列：上一次落盘失败触发的重读不会插到下一次写入之前。
     ///
-    /// operation 里只能同步地发起 `refresh()`（它自己创建任务）；不要在 operation 内 `await` 刷新结果——
-    /// 刷新会先 `await mutationTail`，也就是当前这个写任务本身，会形成环。
+    /// operation 里只能同步地发起 `refresh()`（它自己创建任务）；不要在 operation 内 `await` 刷新结果——刷新会先 `await
+    /// mutationTail`，也就是当前这个写任务本身，会形成环。
     @ObservationIgnored private var mutationTail: Task<Void, Never>?
 
     @ObservationIgnored private var generation = 0
 
     /// 页面是否可见；不可见时保存通知只记脏、不查库。
-    ///
-    /// 书签写入来自用户操作，频率不高；这条规则主要保证与历史页一致的行为：
-    /// 切回来时能看到不可见期间的新增／删除，而不是靠一次无条件的重读。
     @ObservationIgnored private var isActive = true
     @ObservationIgnored private var hasPendingChange = false
 
-    init(store: BookmarkStore) {
-        self.store = store
+    init(bookmarkStore: BookmarkStore, followingStore: FollowingStore) {
+        self.bookmarkStore = bookmarkStore
+        self.followingStore = followingStore
     }
 
     deinit {
         loadTask?.cancel()
-        changeTask?.cancel()
+        changeTasks.forEach { $0.cancel() }
     }
 
-    /// 开始观察书签的变更：新增、删除、清空都会让列表重读；页面不可见时只记脏，切回补读。
+    /// 关注与书签都为空；页面据此显示空态。
+    var isEmpty: Bool {
+        followings.isEmpty && groups.isEmpty
+    }
+
+    /// 开始观察变更：书签与关注的写入都会让列表重读；页面不可见时只记脏，切回补读。
     ///
     /// 普通写入由 SwiftData 在 `save()` 时自动发通知；批量写不发，由写方补一次
     /// （见 `PersistentChangeSignal.postBatchChange`）。
     func startObservingChanges() {
-        guard changeTask == nil else {
+        guard changeTasks.isEmpty else {
             return
         }
 
-        changeTask = Task { [weak self] in
-            for await _ in PersistentChangeSignal
-                .changes(entityName: PersistentChangeSignal.Entity.bookmark) {
-                guard let self else {
-                    return
-                }
+        let entities = [PersistentChangeSignal.Entity.bookmark, PersistentChangeSignal.Entity.following]
+        changeTasks = entities.map { entity in
+            Task { [weak self] in
+                for await _ in PersistentChangeSignal.changes(entityName: entity) {
+                    guard let self else {
+                        return
+                    }
 
-                scheduleRefresh()
+                    scheduleRefresh()
+                }
             }
         }
     }
 
     /// 由视图在 `.task(id:)` 里同步可见性：切走暂停刷新，切回补一次。
-    ///
-    /// 首次进入时调用方还会显式 `refresh()`（见视图的任务块），这里只在「不可见期间有过写入」时补读。
     func setActive(_ active: Bool) {
         isActive = active
         guard active, hasPendingChange else { return }
@@ -118,14 +125,14 @@ final class BookmarksViewModel {
         }
     }
 
-    /// 读取全部收藏；已加载过（包括空结果）的刷新保持当前展示，避免切回该分区时闪骨架。
+    /// 读取关注与书签；已加载过（包括空结果）的刷新保持当前展示，避免切回该分区时闪骨架。
     func refresh() {
         loadTask?.cancel()
         generation &+= 1
         let generation = generation
         let pendingMutation = mutationTail
 
-        if sections.isEmpty, loadState != .loaded {
+        if isEmpty, loadState != .loaded {
             loadState = .loading
         }
 
@@ -137,12 +144,17 @@ final class BookmarksViewModel {
             guard generation == self.generation else { return }
 
             do {
-                let entries = try await store.entries()
+                async let bookmarks = bookmarkStore.entries()
+                async let following = followingStore.entries()
+                let (entries, follows) = try await (bookmarks, following)
                 guard generation == self.generation else { return }
 
-                let groups = Self.group(entries)
-                if groups != sections {
-                    sections = groups
+                let grouped = Self.group(entries)
+                if follows != followings {
+                    followings = follows
+                }
+                if grouped != groups {
+                    groups = grouped
                 }
                 loadState = .loaded
             } catch {
@@ -154,7 +166,7 @@ final class BookmarksViewModel {
                 )
 
                 // 已有内容时保留当前展示，不让一次后台刷新失败把整页换成错误页。
-                if sections.isEmpty {
+                if isEmpty {
                     loadState = .failed(.loadFailed)
                 } else {
                     loadState = .loaded
@@ -163,16 +175,16 @@ final class BookmarksViewModel {
         }
     }
 
-    /// 删除一条收藏：先带动画本地移除（剩余胶囊平滑回流），再落盘；失败提示并重读。
+    /// 删除一条书签：先带动画本地移除（剩余胶囊平滑回流），再落盘；失败提示并重读。
     func remove(_ bookmark: Bookmark) {
         invalidateInFlightLoads()
         withAnimation(.snappy) {
-            sections = sections.compactMap { section in
+            groups = groups.compactMap { group in
                 // 按身份键过滤：payload 不参与身份，重收藏后两者可能不同。
-                let entries = section.entries.filter { $0.identity != bookmark.identity }
+                let entries = group.entries.filter { $0.identity != bookmark.identity }
                 return entries.isEmpty
                     ? nil
-                    : BookmarksSection(sourceID: section.sourceID, entries: entries)
+                    : BookmarkGroup(kindID: group.kindID, entries: entries)
             }
         }
 
@@ -180,7 +192,7 @@ final class BookmarksViewModel {
             guard let self else { return }
 
             do {
-                try await store.remove(bookmark)
+                try await bookmarkStore.remove(bookmark)
             } catch {
                 AppLogger.warning(
                     "书签收藏删除失败，errorType=\(type(of: error))",
@@ -193,21 +205,67 @@ final class BookmarksViewModel {
         }
     }
 
-    /// 清空一个来源：先带动画整组移除（下方分组上移补位），再落盘；失败提示并重读。
-    func clear(sourceID: ComicSourceID) {
+    /// 删除一条关注：先本地移除，再落盘；失败提示并重读。
+    func unfollow(_ following: Following) {
         invalidateInFlightLoads()
         withAnimation(.snappy) {
-            sections.removeAll { $0.sourceID == sourceID }
+            followings.removeAll { $0.identity == following.identity }
         }
 
         enqueueMutation { [weak self] in
             guard let self else { return }
 
             do {
-                try await store.removeAll(sourceID: sourceID)
+                try await followingStore.remove(following)
             } catch {
                 AppLogger.warning(
-                    "书签分组清除失败，source=\(sourceID.rawValue) errorType=\(type(of: error))",
+                    "删除关注失败，errorType=\(type(of: error))",
+                    category: "Bookmarks",
+                )
+                ToastCenter.shared.show("删除失败，请稍后重试", type: .error)
+                refresh()
+            }
+        }
+    }
+
+    /// 清空一个维度（分类或标签）的全部收藏，跨来源。
+    func clear(kindID: String) {
+        invalidateInFlightLoads()
+        withAnimation(.snappy) {
+            groups.removeAll { $0.kindID == kindID }
+        }
+
+        enqueueMutation { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await bookmarkStore.removeAll(kindID: kindID)
+            } catch {
+                AppLogger.warning(
+                    "书签维度清除失败，kind=\(kindID) errorType=\(type(of: error))",
+                    category: "Bookmarks",
+                )
+                ToastCenter.shared.show("清除失败，请稍后重试", type: .error)
+                refresh()
+            }
+        }
+    }
+
+    /// 清空全部关注。
+    func clearFollowings() {
+        invalidateInFlightLoads()
+        withAnimation(.snappy) {
+            followings = []
+        }
+
+        enqueueMutation { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await followingStore.removeAll()
+            } catch {
+                AppLogger.warning(
+                    "关注清除失败，errorType=\(type(of: error))",
                     category: "Bookmarks",
                 )
                 ToastCenter.shared.show("清除失败，请稍后重试", type: .error)
@@ -236,21 +294,34 @@ final class BookmarksViewModel {
         }
     }
 
-    /// 按来源分组，组序取「最近收藏先出现」的首次出现顺序；实际展示顺序由页面按来源 Tab 顺序排。
-    private static func group(_ entries: [Bookmark]) -> [BookmarksSection] {
-        var order: [ComicSourceID] = []
-        var grouped: [ComicSourceID: [Bookmark]] = [:]
+    /// 按维度分组：分类 → 标签 → 未登记维度（按标识排序）；段内保持读取顺序（最近收藏在前）。
+    private static func group(_ entries: [Bookmark]) -> [BookmarkGroup] {
+        var grouped: [String: [Bookmark]] = [:]
 
         for entry in entries {
-            if grouped[entry.sourceID] == nil {
-                order.append(entry.sourceID)
+            grouped[entry.kindID, default: []].append(entry)
+        }
+
+        return grouped.keys
+            .sorted { lhs, rhs in
+                let left = rank(lhs)
+                let right = rank(rhs)
+                return left == right ? lhs < rhs : left < right
             }
+            .compactMap { kindID in
+                grouped[kindID].map { BookmarkGroup(kindID: kindID, entries: $0) }
+            }
+    }
 
-            grouped[entry.sourceID, default: []].append(entry)
+    /// 维度展示顺序：分类、标签，其余排在后面。
+    private static func rank(_ kindID: String) -> Int {
+        if kindID == ComicTagKind.category.id {
+            return 0
+        }
+        if kindID == ComicTagKind.tag.id {
+            return 1
         }
 
-        return order.compactMap { sourceID in
-            grouped[sourceID].map { BookmarksSection(sourceID: sourceID, entries: $0) }
-        }
+        return 2
     }
 }

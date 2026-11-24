@@ -25,6 +25,15 @@ struct GeneralCleanupSection: View {
             ) {
                 showsClearCacheConfirmation = true
             }
+            // 每个确认框挂在自己的行上：`Section` 上挂 `.alert` 不会呈现（点了没有任何反应）。
+            .alert(isPresented: $showsClearCacheConfirmation) {
+                confirmation(
+                    title: "清除图片缓存？",
+                    message: "将清空 App 的图片磁盘缓存，浏览时会按需重新下载。",
+                ) {
+                    Task { await model?.clearCache() }
+                }
+            }
 
             CleanupActionRow(
                 title: model?.isClearingDownloads == true ? "正在清除下载记录..." : "清除下载记录",
@@ -34,6 +43,14 @@ struct GeneralCleanupSection: View {
             ) {
                 showsClearDownloadsConfirmation = true
             }
+            .alert(isPresented: $showsClearDownloadsConfirmation) {
+                confirmation(
+                    title: "清除下载记录？",
+                    message: "将删除全部下载记录和已下载的本地图片，正在下载的任务会一并停止。",
+                ) {
+                    Task { await model?.clearDownloads() }
+                }
+            }
 
             CleanupActionRow(
                 title: model?.isClearingReadingHistory == true ? "正在清除阅读记录..." : "清除全部阅读记录",
@@ -41,6 +58,14 @@ struct GeneralCleanupSection: View {
                 isDisabled: model?.isClearingData == true,
             ) {
                 showsClearReadingHistoryConfirmation = true
+            }
+            .alert(isPresented: $showsClearReadingHistoryConfirmation) {
+                confirmation(
+                    title: "清除全部阅读记录？",
+                    message: "将清除全部阅读历史，以及各作品已保存的继续阅读进度。",
+                ) {
+                    Task { await model?.clearReadingHistory() }
+                }
             }
 
             CleanupActionRow(
@@ -51,40 +76,17 @@ struct GeneralCleanupSection: View {
             ) {
                 Task { await model?.handleOtherDataTap() }
             }
+            .alert(isPresented: cleanupConfirmationBinding) {
+                confirmation(
+                    title: "清理其他数据？",
+                    message: model?.otherDataCleanupMessage ?? "",
+                    confirmTitle: "清理",
+                ) {
+                    Task { await model?.cleanOtherData() }
+                }
+            }
         } header: {
             Text("清理")
-        }
-        .alert("清除图片缓存？", isPresented: $showsClearCacheConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("清除", role: .destructive) {
-                Task { await model?.clearCache() }
-            }
-        } message: {
-            Text("将清空 App 的图片磁盘缓存，浏览时会按需重新下载。")
-        }
-        .alert("清除全部阅读记录？", isPresented: $showsClearReadingHistoryConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("清除", role: .destructive) {
-                Task { await model?.clearReadingHistory() }
-            }
-        } message: {
-            Text("将清除全部阅读历史，以及各作品已保存的继续阅读进度。")
-        }
-        .alert("清除下载记录？", isPresented: $showsClearDownloadsConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("清除", role: .destructive) {
-                Task { await model?.clearDownloads() }
-            }
-        } message: {
-            Text("将删除全部下载记录和已下载的本地图片，正在下载的任务会一并停止。")
-        }
-        .alert("清理其他数据？", isPresented: cleanupConfirmationBinding) {
-            Button("取消", role: .cancel) {}
-            Button("清理", role: .destructive) {
-                Task { await model?.cleanOtherData() }
-            }
-        } message: {
-            Text(model?.otherDataCleanupMessage ?? "")
         }
         .task {
             if model == nil {
@@ -97,6 +99,21 @@ struct GeneralCleanupSection: View {
             }
             await model?.prepare()
         }
+    }
+
+    /// 清理分区的统一确认框：取消按钮走系统默认样式，与书架、搜索页一致。
+    private func confirmation(
+        title: String,
+        message: String,
+        confirmTitle: String = "清除",
+        action: @escaping () -> Void,
+    ) -> Alert {
+        Alert(
+            title: Text(title),
+            message: Text(message),
+            primaryButton: .destructive(Text(confirmTitle), action: action),
+            secondaryButton: .cancel(Text("取消")),
+        )
     }
 
     /// 「清理其他数据」的确认状态由 model 持有（检查完成后才置位）。

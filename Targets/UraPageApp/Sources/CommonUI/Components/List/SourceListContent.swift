@@ -104,7 +104,7 @@ struct SourceListContent<Query: Hashable & Sendable, Cursor: Sendable, CoverOver
     private func toolbarContent(_ model: SourceListPageModel<Query, Cursor>) -> some ToolbarContent {
         if let bookmark {
             ToolbarItem(placement: .topBarTrailing) {
-                BookmarkButton(bookmark: bookmark)
+                ListMarkButton(bookmark: bookmark)
             }
         }
 

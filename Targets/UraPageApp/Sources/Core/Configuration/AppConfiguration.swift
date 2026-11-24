@@ -20,7 +20,8 @@ enum AppConfiguration {
         static let downloadStore = AppIdentifierNamespace.make("v2.downloads.store")
 
         /// 书签收藏（标签／作者／分类）数据库，与搜索历史、阅读记录分开。
-        static let bookmarkStore = AppIdentifierNamespace.make("v2.bookmarks.store")
+        static let bookmarkStore = AppIdentifierNamespace.make("v3.bookmarks.store")
+        static let followingStore = AppIdentifierNamespace.make("v1.followings.store")
     }
 
     enum Downloads {

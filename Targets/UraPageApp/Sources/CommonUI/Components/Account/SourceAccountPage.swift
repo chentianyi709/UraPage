@@ -73,14 +73,15 @@ struct SourceAccountPage<Profile: Sendable, ProfileContent: View>: View {
         .task {
             await access.ensureRestored()
         }
-        .alert("退出登录？", isPresented: $showsLogoutConfirmation) {
-            Button("取消", role: .cancel) {}
-
-            Button("退出", role: .destructive) {
-                performLogout()
-            }
-        } message: {
-            Text(logoutConfirmationMessage)
+        .alert(isPresented: $showsLogoutConfirmation) {
+            Alert(
+                title: Text("退出登录？"),
+                message: Text(logoutConfirmationMessage),
+                primaryButton: .destructive(Text("退出")) {
+                    performLogout()
+                },
+                secondaryButton: .cancel(Text("取消")),
+            )
         }
     }
 

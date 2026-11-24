@@ -65,24 +65,15 @@ struct DownloadsView: View {
                 }
             }
         }
-        .alert(
-            "删除下载记录？",
-            isPresented: Binding(
-                get: { pendingDelete != nil },
-                set: {
-                    if !$0 {
-                        pendingDelete = nil
-                    }
+        .alert(item: $pendingDelete) { summary in
+            Alert(
+                title: Text("删除下载记录？"),
+                message: Text("将删除《\(summary.title)》的下载记录，并移除已下载的章节图片与封面文件，此操作不可恢复。"),
+                primaryButton: .destructive(Text("删除")) {
+                    deleteDownload(summary)
                 },
-            ),
-            presenting: pendingDelete,
-        ) { summary in
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
-                deleteDownload(summary)
-            }
-        } message: { summary in
-            Text("将删除《\(summary.title)》的下载记录，并移除已下载的章节图片与封面文件，此操作不可恢复。")
+                secondaryButton: .cancel(Text("取消")),
+            )
         }
     }
 

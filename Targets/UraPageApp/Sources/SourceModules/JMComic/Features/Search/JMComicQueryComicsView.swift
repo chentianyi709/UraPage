@@ -42,7 +42,7 @@ struct JMComicQueryComicsView: View {
             // 与公共列表页一致：收藏与排序菜单各占一个工具栏项，中间用 `ToolbarSpacer` 隔开——
             // 相邻的工具栏项会被系统并成同一颗玻璃胶囊，必须有间隔才是两个独立的圆按钮。
             ToolbarItem(placement: .topBarTrailing) {
-                BookmarkButton(bookmark: bookmark)
+                ListMarkButton(bookmark: bookmark)
             }
 
             ToolbarSpacer(.fixed, placement: .topBarTrailing)

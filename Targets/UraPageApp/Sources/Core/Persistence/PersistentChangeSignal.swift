@@ -14,6 +14,7 @@ enum PersistentChangeSignal {
     enum Entity {
         static let readingProgress = String(describing: StoredReadingProgress.self)
         static let bookmark = String(describing: StoredBookmark.self)
+        static let following = String(describing: StoredFollowing.self)
     }
 
     /// 批量写补发的通知名；与 `didSave` 分开，避免把「某个实体变了」广播成「全都变了」。

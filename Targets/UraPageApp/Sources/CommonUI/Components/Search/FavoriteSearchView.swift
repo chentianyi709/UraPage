@@ -34,13 +34,15 @@ struct FavoriteSearchView: View {
                 .tint(Color.textPrimary)
             }
         }
-        .alert("删除收藏的搜索词？", isPresented: $showsClearConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
-                Task { await history.clearFavorites() }
-            }
-        } message: {
-            Text("将永久删除这些收藏的搜索词，不会回到「最近搜索」。")
+        .alert(isPresented: $showsClearConfirmation) {
+            Alert(
+                title: Text("删除收藏的搜索词？"),
+                message: Text("将永久删除这些收藏的搜索词，不会回到「最近搜索」。"),
+                primaryButton: .destructive(Text("删除")) {
+                    Task { await history.clearFavorites() }
+                },
+                secondaryButton: .cancel(Text("取消")),
+            )
         }
     }
 }

@@ -40,13 +40,15 @@ struct SearchHistoryView: View {
                 }
             }
         }
-        .alert("清除搜索历史？", isPresented: $showsClearConfirmation) {
-            Button("取消", role: .cancel) {}
-            Button("清除", role: .destructive) {
-                Task { await history.clear() }
-            }
-        } message: {
-            Text("将清除本来源的最近搜索，收藏的搜索词会保留。")
+        .alert(isPresented: $showsClearConfirmation) {
+            Alert(
+                title: Text("清除搜索历史？"),
+                message: Text("将清除本来源的最近搜索，收藏的搜索词会保留。"),
+                primaryButton: .destructive(Text("清除")) {
+                    Task { await history.clear() }
+                },
+                secondaryButton: .cancel(Text("取消")),
+            )
         }
     }
 }

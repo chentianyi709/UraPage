@@ -1,7 +1,10 @@
 import Foundation
 import SwiftData
 
-/// 在独立 SwiftData executor 上读写书签收藏；只向上层返回公共值。
+/// 在独立 SwiftData executor 上读写「分类／标签」书签；只向上层返回公共值。
+///
+/// 关注的作者不在这里：那是另一个库、另一套读写（见 `FollowingPersistence`）。
+/// 这里保存的 `kindID` 只会是分类、标签或来源自定义的检索维度，不处理作者。
 @ModelActor
 actor BookmarkPersistence {
     @concurrent
@@ -10,13 +13,13 @@ actor BookmarkPersistence {
         return try BookmarkPersistence(
             modelContainer: SwiftDataStoreContainer.make(
                 schema: schema,
-                name: "BookmarkV2",
+                name: "BookmarkV3",
                 fileName: AppConfiguration.Persistence.bookmarkStore,
             ),
         )
     }
 
-    /// 保存一条收藏；已收藏时刷新 payload 与收藏时间（书架按时间倒序，跳转用最新身份）。
+    /// 保存一条书签；已收藏时刷新 payload 与收藏时间（书架按时间倒序，跳转用最新身份）。
     func save(_ bookmark: Bookmark) throws {
         let now = Date()
         if let stored = try record(for: bookmark) {
@@ -74,14 +77,14 @@ actor BookmarkPersistence {
         try modelContext.save()
     }
 
-    /// 删除某个来源的全部收藏（书架分组右侧的「清除」）。
-    func removeAll(sourceID: ComicSourceID) throws {
-        let rawSourceID = sourceID.rawValue
+    /// 删除某个维度（分类或标签）的全部收藏，跨来源。
+    func removeAll(kindID: String) throws {
         try modelContext.delete(
             model: StoredBookmark.self,
-            where: #Predicate { $0.sourceID == rawSourceID },
+            where: #Predicate { $0.kind == kindID },
         )
         try modelContext.save()
+        PersistentChangeSignal.postBatchChange(entityName: PersistentChangeSignal.Entity.bookmark)
     }
 
     /// 按「来源 + 维度 + 展示名」查一行（`#Unique` 唯一索引）。
