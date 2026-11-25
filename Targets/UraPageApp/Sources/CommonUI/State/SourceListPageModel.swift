@@ -1,5 +1,20 @@
 import Observation
 
+/// 工具栏上一个菜单位置的展示状态。
+///
+/// 把「有没有数据」「有没有失败」「是不是还在加载」合成一个值：视图每行只读一次，
+/// 不再分别调用三个派生方法、重复遍历同一份状态。
+enum MenuSlotState: Equatable {
+    /// 还没有可用数据（首屏等待或远端请求中）：位置显示进度。
+    case loading
+
+    /// 可用数据：展示选择菜单。
+    case items([SelectionMenuItem])
+
+    /// 数据不可用：位置变成重试按钮。
+    case failed(SourceLoadDisplayError)
+}
+
 /// 来源列表页的页面级状态与数据加载链。
 ///
 /// 数据链「前提菜单 → 列表首屏」的每个菜单请求各跑在自己的任务里；任务只在写回状态时短暂引用本对象，
@@ -108,10 +123,21 @@ final class SourceListPageModel<Query: Hashable & Sendable, Cursor: Sendable> {
         return nil
     }
 
+    /// 该位置当前的状态：视图只读它；菜单项只取一次，失败判定复用同一份结果。
+    func menuSlot(at index: Int) -> MenuSlotState {
+        let items = menuItems(at: index)
+
+        if let displayError = menuFailure(at: index, items: items) {
+            return .failed(displayError)
+        }
+
+        return items.map(MenuSlotState.items) ?? .loading
+    }
+
     /// 该菜单位置当前的展示项；`nil` 表示还没有可用数据。
     ///
     /// 固定菜单直接用声明值；远端菜单用自己请求的结果；首屏提供的菜单读列表首屏结果。
-    func menuItems(at index: Int) -> [SelectionMenuItem]? {
+    private func menuItems(at index: Int) -> [SelectionMenuItem]? {
         switch descriptor.menus[index].source {
         case let .fixed(items):
             items
@@ -126,10 +152,11 @@ final class SourceListPageModel<Query: Hashable & Sendable, Cursor: Sendable> {
 
     /// 该菜单当前的数据不可用错误；`nil` 表示可用或仍在加载。
     ///
+    /// `items` 由调用方传入已经取好的菜单项，避免重复查询。
     /// 首屏提供的菜单跟随列表首屏的**首次成功结果**：首屏成功后菜单即固定，之后切换筛选
     /// 导致列表失败也不影响菜单；首屏失败且尚无菜单数据时该位置变成重试按钮。
     /// 首屏成功但没有带回该菜单的数据时同样按不可用处理。重试等于重新加载首屏。
-    func menuFailure(at index: Int) -> SourceLoadDisplayError? {
+    private func menuFailure(at index: Int, items: [SelectionMenuItem]?) -> SourceLoadDisplayError? {
         switch descriptor.menus[index].source {
         case .fixed:
             return nil
@@ -139,7 +166,7 @@ final class SourceListPageModel<Query: Hashable & Sendable, Cursor: Sendable> {
 
         case .firstPage:
             // 已有菜单数据时保持可用：列表失败由正文表达，工具栏不再变成重试按钮。
-            guard menuItems(at: index) == nil else {
+            guard items == nil else {
                 return nil
             }
 
@@ -156,11 +183,6 @@ final class SourceListPageModel<Query: Hashable & Sendable, Cursor: Sendable> {
                 return nil
             }
         }
-    }
-
-    /// 菜单还没有数据且未失败：该菜单位置显示进度，而不是空白（首次加载、切回时的重新加载）。
-    func isAwaitingMenuData(at index: Int) -> Bool {
-        menuItems(at: index) == nil && menuFailure(at: index) == nil
     }
 
     // MARK: - 数据链

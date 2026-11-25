@@ -65,10 +65,12 @@ struct BikaSearchView: View {
             results: {
                 if let model, let query = model.query {
                     PagedComicListView(
-                        emptyTitle: "暂无搜索结果",
-                        emptyMessage: "换个关键词或筛选条件试试",
-                        emptyIllustration: .search,
-                        failureTitle: "搜索失败",
+                        text: ListText(
+                            emptyTitle: "暂无搜索结果",
+                            emptyMessage: "换个关键词或筛选条件试试",
+                            emptyIllustration: .search,
+                            failureTitle: "搜索失败",
+                        ),
                         model: model.paging,
                         query: query,
                         onSelect: open,

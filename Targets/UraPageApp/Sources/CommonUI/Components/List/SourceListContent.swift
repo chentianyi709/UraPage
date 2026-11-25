@@ -84,9 +84,11 @@ struct SourceListContent<Query: Hashable & Sendable, Cursor: Sendable, CoverOver
     /// 分页列表本体。
     private func list(_ model: SourceListPageModel<Query, Cursor>) -> some View {
         PagedComicListView(
-            emptyTitle: model.descriptor.emptyTitle,
-            emptyMessage: model.descriptor.emptyMessage,
-            failureTitle: model.descriptor.failureTitle,
+            text: ListText(
+                emptyTitle: model.descriptor.emptyTitle,
+                emptyMessage: model.descriptor.emptyMessage,
+                failureTitle: model.descriptor.failureTitle,
+            ),
             model: model.paging,
             query: model.query,
             onSelect: onSelect,
@@ -116,28 +118,42 @@ struct SourceListContent<Query: Hashable & Sendable, Cursor: Sendable, CoverOver
         if !model.descriptor.menus.isEmpty {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 ForEach(model.descriptor.menus.enumerated(), id: \.element.id) { index, menu in
-                    let items = model.menuItems(at: index) ?? []
-
-                    if model.menuFailure(at: index) != nil {
+                    switch model.menuSlot(at: index) {
+                    case .failed:
                         retryButton(for: menu, at: index, model: model)
-                    } else {
-                        SelectionMenu(
-                            items: items,
-                            selectedID: menu.selectedID(model.query),
-                            // 默认项：菜单显式声明的优先，否则取第一项；据此在工具栏做「非默认高亮」。
-                            defaultID: menu.resolvedDefaultID(items: items),
-                            isLoading: model.isAwaitingMenuData(at: index),
-                            systemImage: menu.systemImage,
-                            accessibilityLabel: menu.accessibilityLabel,
-                            loadingAccessibilityLabel: menu.loadingAccessibilityLabel,
-                            onSelect: { selectionID in
-                                model.select(selectionID: selectionID, inMenuAt: index)
-                            },
-                        )
+
+                    case let .items(items):
+                        selectionMenu(items, isLoading: false, for: menu, at: index, model: model)
+
+                    case .loading:
+                        selectionMenu([], isLoading: true, for: menu, at: index, model: model)
                     }
                 }
             }
         }
+    }
+
+    /// 一个正常的选择菜单；加载中时传空项 + `isLoading`，菜单位置显示进度。
+    private func selectionMenu(
+        _ items: [SelectionMenuItem],
+        isLoading: Bool,
+        for menu: SourceToolbarMenu<Query>,
+        at index: Int,
+        model: SourceListPageModel<Query, Cursor>,
+    ) -> some View {
+        SelectionMenu(
+            items: items,
+            selectedID: menu.selectedID(model.query),
+            // 默认项：菜单显式声明的优先，否则取第一项；据此在工具栏做「非默认高亮」。
+            defaultID: menu.resolvedDefaultID(items: items),
+            isLoading: isLoading,
+            systemImage: menu.systemImage,
+            accessibilityLabel: menu.accessibilityLabel,
+            loadingAccessibilityLabel: menu.loadingAccessibilityLabel,
+            onSelect: { selectionID in
+                model.select(selectionID: selectionID, inMenuAt: index)
+            },
+        )
     }
 
     /// 菜单数据不可用时的重试按钮：点击重新获取该菜单数据。

@@ -1,5 +1,20 @@
 import SwiftUI
 
+/// 分页列表的空态与失败文案。
+///
+/// 空态与失败相关的四个字段总是同时出现，收成一个值一起传，避免每处调用都排一遍参数。
+struct ListText {
+    /// 空态标题与说明。
+    let emptyTitle: String
+    let emptyMessage: String
+
+    /// 空态插图；搜索页传 `.search`，其余列表用默认空数据插图。
+    var emptyIllustration: EmptyStateView.Illustration = .empty
+
+    /// 首屏失败标题。
+    let failureTitle: String
+}
+
 /// 公共漫画分页列表页：统一首屏骨架、空态、失败、追加与滚动行为。
 ///
 /// 只编排“分页列表页”的展示状态；Query/Cursor、请求、文案与点击动作由来源页面提供。
@@ -8,15 +23,8 @@ import SwiftUI
 /// 页面出现与查询变化都在这里按新查询驱动首屏加载（已加载完成时不重复请求）。
 /// 卡片封面叠层由页面注入（页面自己的标记或进度），这里只负责把它透传给每张卡片。
 struct PagedComicListView<Query: Equatable & Sendable, Cursor: Sendable, CoverOverlay: View>: View {
-    /// 空态文案：标题与说明。
-    let emptyTitle: String
-    let emptyMessage: String
-
-    /// 空态插图；搜索页传 `.search`，其余列表用默认空数据插图。
-    var emptyIllustration: EmptyStateView.Illustration = .empty
-
-    /// 首屏失败标题；失败详情使用模型给出的展示错误文案。
-    let failureTitle: String
+    /// 空态与失败文案。
+    let text: ListText
 
     /// 分页模型；由页面创建并持有，查询变化时页面也会直接用它继续加载。
     let model: ComicPagingModel<Query, Cursor>
@@ -32,19 +40,13 @@ struct PagedComicListView<Query: Equatable & Sendable, Cursor: Sendable, CoverOv
 
     /// 不带封面叠层的列表（页面没有额外标记时）。
     init(
-        emptyTitle: String,
-        emptyMessage: String,
-        emptyIllustration: EmptyStateView.Illustration = .empty,
-        failureTitle: String,
+        text: ListText,
         model: ComicPagingModel<Query, Cursor>,
         query: Query,
         onSelect: @escaping (ComicListItem) -> Void,
     ) where CoverOverlay == EmptyView {
         self.init(
-            emptyTitle: emptyTitle,
-            emptyMessage: emptyMessage,
-            emptyIllustration: emptyIllustration,
-            failureTitle: failureTitle,
+            text: text,
             model: model,
             query: query,
             onSelect: onSelect,
@@ -54,19 +56,13 @@ struct PagedComicListView<Query: Equatable & Sendable, Cursor: Sendable, CoverOv
 
     /// 页面自带封面叠层：叠层内容由页面决定，公共列表不认识它。
     init(
-        emptyTitle: String,
-        emptyMessage: String,
-        emptyIllustration: EmptyStateView.Illustration = .empty,
-        failureTitle: String,
+        text: ListText,
         model: ComicPagingModel<Query, Cursor>,
         query: Query,
         onSelect: @escaping (ComicListItem) -> Void,
         @ContentBuilder coverOverlay: @escaping (ComicListItem) -> CoverOverlay,
     ) {
-        self.emptyTitle = emptyTitle
-        self.emptyMessage = emptyMessage
-        self.emptyIllustration = emptyIllustration
-        self.failureTitle = failureTitle
+        self.text = text
         self.model = model
         self.query = query
         self.onSelect = onSelect
@@ -95,9 +91,13 @@ struct PagedComicListView<Query: Equatable & Sendable, Cursor: Sendable, CoverOv
         ) {
             ComicGridSkeletonView()
         } empty: {
-            EmptyStateView(title: emptyTitle, message: emptyMessage, illustration: emptyIllustration)
+            EmptyStateView(
+                title: text.emptyTitle,
+                message: text.emptyMessage,
+                illustration: text.emptyIllustration,
+            )
         } failure: { paging, error in
-            LoadErrorView(title: failureTitle, message: error.message) {
+            LoadErrorView(title: text.failureTitle, message: error.message) {
                 paging.retryInitialLoading()
             }
         } content: { paging in
