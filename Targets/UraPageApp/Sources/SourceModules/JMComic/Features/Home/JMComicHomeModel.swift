@@ -24,16 +24,11 @@ final class JMComicHomeModel {
         }
     }
 
-    /// 页面首屏阶段：只用于整页骨架、整页失败与空态。
+    /// 页面首屏阶段：只用于整页骨架与空态。
     ///
-    /// 任一分区有结果就进入内容态，由内容视图按各分区自己的阶段显示内容或骨架；
-    /// 两个分区都失败才整页失败（此时一个重试按钮同时重发两个请求）。
+    /// 两个分区各自失败、各自重试，任何组合下都不合并成整页失败：
+    /// 任一分区已有结果就进入内容态，失败的分区在原地显示失败块。
     var loadState: InitialLoadState<SourceLoadDisplayError> {
-        if case let .failed(randomError) = randomRecommendations.loadState,
-           case .failed = sections.loadState {
-            return .failed(randomError)
-        }
-
         if isAwaitingFirstResult {
             return .loading
         }
@@ -69,7 +64,7 @@ final class JMComicHomeModel {
         sections.loadIfNeeded()
     }
 
-    /// 整页失败态的重试：`SourceValueLoadModel.retry()` 只对失败分区重新发起请求。
+    /// 重发两个分区里失败的请求：`SourceValueLoadModel.retry()` 只对失败分区重新发起。
     func retry() {
         randomRecommendations.retry()
         sections.retry()
